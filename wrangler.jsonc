@@ -44,7 +44,8 @@
 			"workers_dev": true,
 			"vars": {
 				"APP_ENV": "production",
-				"PUBLIC_APP_ORIGIN": "https://campusconnect-production.vt-campusconnect.workers.dev"
+				"PUBLIC_APP_ORIGIN": "https://campusconnect-production.vt-campusconnect.workers.dev",
+				"DEPLOYMENT_MARKER": "production-ci"
 			},
 			"r2_buckets": [
 				{
