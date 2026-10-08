@@ -8,6 +8,7 @@ type Bindings = {
   RESOURCE_IMAGES?: R2Bucket;
   APP_ENV?: string;
   PUBLIC_APP_ORIGIN?: string;
+  DEPLOYMENT_MARKER?: string;
   SESSION_SECRET?: string;
 };
 
@@ -75,6 +76,7 @@ app.get("/api/health", async (c) => {
       ok: true,
       environment: c.env.APP_ENV ?? "unknown",
       database: "connected",
+      deployment: c.env.DEPLOYMENT_MARKER ?? "not-set",
     });
   } catch {
     return c.json(
@@ -82,6 +84,7 @@ app.get("/api/health", async (c) => {
         ok: false,
         environment: c.env.APP_ENV ?? "unknown",
         database: "unavailable",
+        deployment: c.env.DEPLOYMENT_MARKER ?? "not-set",
       },
       503,
     );

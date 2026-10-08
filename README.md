@@ -92,7 +92,7 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
 
 ## Migrations and environment variables
 
-- `migrations/dev/` contains SQL for Neon `dev` and is applied manually by the designated maintainer when the shared dev schema changes.
+- `migrations/dev/` contains SQL for Neon `dev` and is applied manually by the owner when the shared dev schema changes.
 - `migrations/prod/` contains production-safe SQL for Neon `main` and runs separately with `npm run migrate:prod`.
 - `scripts/migrate.ts` applies files in order and records applied versions in `schema_migrations`.
 - Never run dev migrations against Neon `main` or production migrations against Neon `dev` without reviewing them.

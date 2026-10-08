@@ -5,6 +5,7 @@
     ok: boolean
     environment: string
     database: string
+    deployment?: string
   }
 
   type SmokeReport = {
@@ -144,6 +145,9 @@
         <p class="eyebrow">Overall result</p>
         <h2>{report.ok ? 'R2 and database connected' : 'A check needs attention'}</h2>
         <p>Worker environment: <code>{report.environment}</code></p>
+        {#if health?.deployment}
+          <p>Deployment marker: <code>{health.deployment}</code></p>
+        {/if}
       </div>
       <span class="status">{report.ok ? 'PASS' : 'FAIL'}</span>
     </section>
