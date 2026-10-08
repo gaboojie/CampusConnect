@@ -1,0 +1,80 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "campusconnect",
+	"main": "worker/index.ts",
+	"compatibility_date": "2026-10-08",
+	"compatibility_flags": [
+		"nodejs_compat_v2"
+	],
+	"workers_dev": false,
+	"assets": {
+		"directory": "./dist",
+		"binding": "ASSETS",
+		"not_found_handling": "single-page-application"
+	},
+	"env": {
+		"dev": {
+			"name": "campusconnect-dev",
+			"workers_dev": false,
+			"vars": {
+				"APP_ENV": "dev",
+				"PUBLIC_APP_ORIGIN": "http://localhost:8787"
+			},
+			"r2_buckets": [
+				{
+					"binding": "RESOURCE_IMAGES",
+					"bucket_name": "campusconnect-dev-images",
+					"remote": true
+				}
+			],
+			"secrets": {
+				"required": [
+					"SESSION_SECRET"
+				]
+			},
+			"hyperdrive": [
+				{
+					"binding": "DB",
+					"id": "91969af1955c473ba73a5bd9e9807e61"
+				}
+			]
+		},
+		"production": {
+			"name": "campusconnect-production",
+			"workers_dev": true,
+			"vars": {
+				"APP_ENV": "production",
+				"PUBLIC_APP_ORIGIN": "https://campusconnect-production.vt-campusconnect.workers.dev"
+			},
+			"r2_buckets": [
+				{
+					"binding": "RESOURCE_IMAGES",
+					"bucket_name": "campusconnect-production-images"
+				}
+			],
+			"triggers": {
+				"crons": [
+					"*/15 * * * *",
+					"0 6 * * *"
+				]
+			},
+			"secrets": {
+				"required": [
+					"SESSION_SECRET"
+				]
+			},
+			"hyperdrive": [
+				{
+					"binding": "DB",
+					"id": "d6811aa10d8942bb82ae0d04cb7345f4"
+				}
+			]
+		}
+	},
+	"r2_buckets": [
+		{
+			"bucket_name": "campusconnect-production-images",
+			"binding": "RESOURCE_IMAGES"
+		}
+	]
+}

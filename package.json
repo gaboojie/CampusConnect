@@ -1,0 +1,45 @@
+{
+  "name": "campusconnect",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "worker:dev": "CLOUDFLARE_ENV=dev wrangler dev --env dev",
+    "r2:smoke:put": "wrangler r2 object put campusconnect-dev-images/dev-smoke/campusconnect.txt --file=./scripts/fixtures/r2-smoke.txt --remote",
+    "r2:smoke:delete": "wrangler r2 object delete campusconnect-dev-images/dev-smoke/campusconnect.txt --remote",
+    "r2:smoke:put:production": "wrangler r2 object put campusconnect-production-images/prod-smoke/campusconnect.txt --file=./scripts/fixtures/r2-smoke-production.txt --remote",
+    "r2:smoke:delete:production": "wrangler r2 object delete campusconnect-production-images/prod-smoke/campusconnect.txt --remote",
+    "worker:deploy:production": "wrangler deploy --env production",
+    "migrate": "tsx scripts/migrate.ts --environment dev",
+    "migrate:dev": "tsx scripts/migrate.ts --environment dev",
+    "migrate:prod": "tsx scripts/migrate.ts --environment prod"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261008.1",
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "@tsconfig/svelte": "^5.0.8",
+    "@types/node": "^24.13.3",
+    "@types/pg": "^8.23.1",
+    "svelte": "^5.57.0",
+    "svelte-check": "^4.7.6",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.3",
+    "wrangler": "^4.149.0"
+  },
+  "dependencies": {
+    "hono": "^4.13.13",
+    "pg": "^8.23.1"
+  }
+}
