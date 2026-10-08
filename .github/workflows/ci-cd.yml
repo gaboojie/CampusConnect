@@ -1,0 +1,72 @@
+name: CampusConnect CI/CD
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: campusconnect-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  deploy-production:
+    needs: validate
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    environment:
+      name: production
+      url: https://campusconnect-production.vt-campusconnect.workers.dev
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Deploy production Worker
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --env production
+
+      - name: Verify production health
+        env:
+          APP_ORIGIN: ${{ vars.APP_ORIGIN }}
+        run: |
+          curl --fail --show-error --retry 3 "$APP_ORIGIN/api/health"
+          curl --fail --show-error --retry 3 \
+            "$APP_ORIGIN/api/integration-smoke?key=prod-smoke%2Fcampusconnect.txt"

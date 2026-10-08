@@ -57,16 +57,32 @@ The dev Worker uses the Cloudflare resources named in the `dev` section of `wran
 
 ## Remote deployment
 
-Production uses the `production` section of `wrangler.jsonc`, Neon `main`, the production R2 bucket, the production Hyperdrive ID, and the configured `workers.dev` URL.
+The repository uses one GitHub deployment environment: `production`. It deploys the `production` section of `wrangler.jsonc` to the production Worker, which connects to Neon `main` through Hyperdrive and uses the production R2 bucket and configured `workers.dev` URL.
 
-Routine production releases are merge-driven:
+The `dev` branch is shared and does not require pull requests. Pushes to `dev` run the validation job only. Developers use local Workers with the shared Neon `dev` database; no separate deployed dev Worker or GitHub `dev` environment is required.
 
-1. When the change is ready for release, open a pull request from `dev` into protected `main`.
-2. Obtain the required review and merge the pull request into `main`. Direct pushes to `main` are disabled.
-3. The GitHub Action triggered by the merge validates the project, applies `migrations/prod/` to Neon `main`, deploys the production Worker, and runs production health and integration checks.
-4. Confirm the action succeeds and verify the production site.
+Production releases follow this procedure:
 
-The GitHub `production` environment should require an approved reviewer and contain the Cloudflare deployment credentials and Neon `main` migration credential. 
+1. Push changes to `dev` and review the validation result.
+2. Open a pull request from `dev` into protected `main`.
+3. Wait for the validation status check to pass and obtain the required review.
+4. Merge the pull request. Direct pushes to `main` are disabled.
+5. The merge creates a push to `main`, which starts `.github/workflows/ci-cd.yml`.
+6. The workflow validates the project, deploys the production Worker, and runs health and integration smoke checks. It does not modify the production database.
+7. Confirm the workflow succeeds and verify the production site.
+
+Configure the GitHub `production` environment with a required reviewer and these secrets:
+
+- `CLOUDFLARE_API_TOKEN`: scoped to the CampusConnect Cloudflare account.
+- `CLOUDFLARE_ACCOUNT_ID`: the Cloudflare account containing the Worker.
+
+Add this environment variable:
+
+```text
+APP_ORIGIN=https://campusconnect-production.vt-campusconnect.workers.dev
+```
+
+Set `SESSION_SECRET` directly on the production Worker with Wrangler. It is not a GitHub Actions variable and is never passed to the frontend.
 
 The production site is:
 
@@ -76,10 +92,12 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
 
 ## Migrations and environment variables
 
-- `migrations/dev/` contains SQL for Neon `dev` and runs with `npm run migrate:dev`.
-- `migrations/prod/` contains production-safe SQL for Neon `main` and runs with `npm run migrate:prod`.
+- `migrations/dev/` contains SQL for Neon `dev` and is applied manually by the designated maintainer when the shared dev schema changes.
+- `migrations/prod/` contains production-safe SQL for Neon `main` and runs separately with `npm run migrate:prod`.
 - `scripts/migrate.ts` applies files in order and records applied versions in `schema_migrations`.
 - Never run dev migrations against Neon `main` or production migrations against Neon `dev` without reviewing them.
+- The production GitHub Action never runs database migrations. A designated maintainer must run production migrations separately after review, a restore point, and explicit approval.
+- The designated maintainer can run a production migration from a secure terminal with `npm run migrate:prod -- --database-url "$DATABASE_URL"`, then unset `DATABASE_URL`.
 - `.env.dev` and `.env.prod` are ignored and must never be committed.
 - `.env.dev.example` documents local Worker values.
 - `.env.prod.example` documents the migration-only `DATABASE_URL`.
@@ -93,6 +111,7 @@ src/                         Svelte frontend
 src/App.svelte               Environment-aware R2/database integration page
 src/app.css                  Frontend styles
 worker/index.ts              Hono Worker API, health check, and asset fallback
+tests/                       Vitest application smoke tests
 migrations/dev/              Development SQL migrations
 migrations/prod/             Production SQL migrations
 scripts/migrate.ts           Transactional migration runner
@@ -103,4 +122,5 @@ package-lock.json            Locked npm dependency versions
 .env.dev.example             Local development variable template
 .env.prod.example            Production migration variable template
 .nvmrc                       Recommended Node.js major version
+.github/workflows/ci-cd.yml  Validation and production deployment workflow
 ```
