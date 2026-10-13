@@ -28,6 +28,8 @@ _Authors: Faria Binta Awal, Ashwaq Alaklabi, Rokeshuvaraj Nagarajan, & Gabriel J
 4. Ask the project owner for access to the Cloudflare account and Neon project. Use the Neon `dev` branch only.
 5. Fill `.env.dev` with:
    - `SESSION_SECRET`: a local-only value - generate one with `openssl rand -hex 32`.
+   - `RESEND_API_KEY`: the development-only Resend sending key.
+   - `RESEND_FROM_EMAIL`: a verified development sender address.
    - `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB`: the Neon `dev` branch connection string with TLS enabled. It must have the pooled option as unselected.
 6. Authenticate Wrangler, which is used to speak with Cloudflare (you need a Cloudflare account):
 
@@ -84,6 +86,15 @@ APP_ORIGIN=https://campusconnect-production.vt-campusconnect.workers.dev
 
 Set `SESSION_SECRET` directly on the production Worker with Wrangler. It is not a GitHub Actions variable and is never passed to the frontend.
 
+Set the production Resend values directly on the production Worker as well:
+
+```sh
+npx wrangler secret put RESEND_API_KEY --env production
+npx wrangler secret put RESEND_FROM_EMAIL --env production
+```
+
+Use a separate sending key and sender for local development. Do not use a production Resend key in `.env.dev`.
+
 The production site is:
 
 ```text
@@ -95,6 +106,15 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
 - `migrations/dev/` contains SQL for Neon `dev` and is applied manually by the owner when the shared dev schema changes.
 - `migrations/prod/` contains production-safe SQL for Neon `main` and runs separately with `npm run migrate:prod`.
 - `scripts/migrate.ts` applies files in order and records applied versions in `schema_migrations`.
+- Before running dev migrations, load `.env.dev`; `npm run migrate:dev` uses `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` for the connection. For example:
+
+  ```sh
+  set -a
+  source .env.dev
+  set +a
+  npm run migrate:dev
+  ```
+
 - `scripts/reset-database.ts` can drop all tables in the selected database after an exact confirmation prompt. Use it only for an intentional reset.
 - Never run dev migrations against Neon `main` or production migrations against Neon `dev` without reviewing them.
 - The production GitHub Action never runs database migrations. A designated maintainer must run production migrations separately after review, a restore point, and explicit approval.
@@ -103,15 +123,18 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
 - `.env.dev.example` documents local Worker values.
 - `.env.prod.example` documents the migration-only `DATABASE_URL`.
 - `SESSION_SECRET` is a Cloudflare Worker secret, not a value in `wrangler.jsonc` or the frontend.
+- `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are server-only Worker secrets and must be configured separately for dev and production. Do not share or commit them.
 - `wrangler.jsonc` contains non-secret environment values, R2 bucket names, Hyperdrive IDs, and Worker settings.
 
 ## Authentication prototype
 
-The public landing page provides login and signup for `@vt.edu` addresses. New accounts receive a seven-day, HttpOnly session cookie backed by the `"Session"` table. Existing seeded accounts do not have passwords yet and cannot log in.
+The public landing page provides login and signup for `@vt.edu` addresses. New accounts must verify their email before receiving a seven-day, HttpOnly session cookie backed by the `"Session"` table. Verification tokens are single-use and have no timestamp-based expiration. Existing seeded accounts do not have passwords yet and cannot log in.
 
 The authentication API is:
 
 - `POST /api/auth/signup`
+- `POST /api/auth/verify-email`
+- `POST /api/auth/resend-verification`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `GET /api/auth/me`

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../worker/index";
 import {
+  createEmailVerificationToken,
+  hashEmailVerificationToken,
   hashPassword,
   hashSessionToken,
   isVtEmail,
@@ -17,10 +19,20 @@ type FakeSession = {
   expiresAt: Date;
 };
 
+type FakeVerificationToken = {
+  tokenId: number;
+  userId: number;
+  tokenHash: string;
+  createdAt: Date;
+  usedAt: Date | null;
+};
+
 class FakeDatabase {
   users: Array<DatabaseUserRow & { password_hash: string | null }> = [];
   sessions: FakeSession[] = [];
+  verificationTokens: FakeVerificationToken[] = [];
   nextUserId = 1;
+  nextTokenId = 1;
 
   createClient(): DatabaseClient {
     return new FakeClient(this);
@@ -49,11 +61,13 @@ class FakeClient implements DatabaseClient {
     }
 
     if (query.startsWith("INSERT INTO \"User\"")) {
-      const [username, email, passwordHash, phoneNumber] = values as [
+      const [username, email, passwordHash, phoneNumber, emailNotificationsOn, textNotificationsOn] = values as [
         string,
         string,
         string,
         string | null,
+        boolean,
+        boolean,
       ];
 
       if (
@@ -77,8 +91,9 @@ class FakeClient implements DatabaseClient {
         created_at: createdAt,
         credit_balance: 20,
         credit_last_reset: createdAt,
-        email_notifications_on: true,
-        text_notifications_on: false,
+        email_notifications_on: emailNotificationsOn,
+        text_notifications_on: textNotificationsOn,
+        email_verified_at: null,
         is_banned: false,
       } satisfies DatabaseUserRow & { password_hash: string | null };
 
@@ -88,6 +103,53 @@ class FakeClient implements DatabaseClient {
 
     if (query.startsWith("INSERT INTO \"CreditTransaction\"")) {
       return { rows: [], rowCount: 1 };
+    }
+
+    if (query.startsWith("INSERT INTO \"EmailVerificationToken\"")) {
+      const [userId, tokenHash] = values as [number, string];
+      this.database.verificationTokens.push({
+        tokenId: this.database.nextTokenId++,
+        userId,
+        tokenHash,
+        createdAt: new Date(),
+        usedAt: null,
+      });
+      return { rows: [], rowCount: 1 };
+    }
+
+    if (query.startsWith("SELECT token_id, user_id")) {
+      const tokenHash = String(values[0]);
+      const token = this.database.verificationTokens.find(
+        (candidate) => candidate.tokenHash === tokenHash && !candidate.usedAt,
+      );
+      return {
+        rows: token
+          ? [{ token_id: token.tokenId, user_id: token.userId } as T]
+          : [],
+        rowCount: token ? 1 : 0,
+      };
+    }
+
+    if (query.startsWith("UPDATE \"EmailVerificationToken\"")) {
+      const [value] = values as [number];
+      if (query.includes("token_id = $1")) {
+        const token = this.database.verificationTokens.find(
+          (candidate) => candidate.tokenId === value && !candidate.usedAt,
+        );
+        if (token) token.usedAt = new Date();
+      } else {
+        for (const token of this.database.verificationTokens) {
+          if (token.userId === value && !token.usedAt) token.usedAt = new Date();
+        }
+      }
+      return { rows: [], rowCount: 1 };
+    }
+
+    if (query.startsWith("UPDATE \"User\"")) {
+      const [userId] = values as [number];
+      const user = this.database.users.find((candidate) => candidate.user_id === userId);
+      if (user) user.email_verified_at = new Date();
+      return { rows: [], rowCount: user ? 1 : 0 };
     }
 
     if (query.startsWith("INSERT INTO \"Session\"")) {
@@ -145,6 +207,8 @@ function validSignup(overrides: Partial<SignupInput> = {}): SignupInput {
     password: "correct horse battery staple",
     confirmPassword: "correct horse battery staple",
     phoneNumber: null,
+    emailNotificationsOn: true,
+    textNotificationsOn: false,
     ...overrides,
   };
 }
@@ -200,12 +264,28 @@ describe("authentication helpers", () => {
     expect(first).toBe(second);
     expect(first).toMatch(/^\\x[0-9a-f]{64}$/);
   });
+
+  it("creates and hashes random email verification tokens", async () => {
+    const first = await createEmailVerificationToken();
+    const second = await createEmailVerificationToken();
+
+    expect(first).not.toBe(second);
+    expect(first).toHaveLength(43);
+    expect(await hashEmailVerificationToken(first)).toMatch(/^\\x[0-9a-f]{64}$/);
+    expect(await hashEmailVerificationToken(first)).not.toBe(first);
+  });
 });
 
 describe("authentication routes", () => {
-  it("supports signup, login session lookup, logout, and protected routes", async () => {
+  it("requires email verification before login and then supports sessions", async () => {
     const database = new FakeDatabase();
-    const app = createApp({ createDatabaseClient: () => database.createClient() });
+    const sentEmails: Array<{ email: string; token: string; userId: number }> = [];
+    const app = createApp({
+      createDatabaseClient: () => database.createClient(),
+      sendVerificationEmail: async (email) => {
+        sentEmails.push(email);
+      },
+    });
     const environment = testEnvironment(database);
 
     const signup = await app.request(
@@ -219,17 +299,66 @@ describe("authentication routes", () => {
     );
 
     expect(signup.status).toBe(201);
-    const session = sessionCookie(signup);
-    expect(session.value).toContain("campusconnect_session=");
-    expect(session.header).toContain("HttpOnly");
+    expect(signup.headers.get("set-cookie")).toBeNull();
+    expect((await signup.json()).message).toContain("Check your Virginia Tech email");
+    expect(sentEmails).toHaveLength(1);
+    expect(database.users[0].email_verified_at).toBeNull();
+    expect(database.verificationTokens[0].tokenHash).not.toBe(sentEmails[0].token);
 
-    const me = await app.request(
+    const unverifiedMe = await app.request(
       "http://localhost/api/auth/me",
-      { headers: { cookie: session.value } },
+      {},
       environment,
     );
-    expect(me.status).toBe(200);
-    expect((await me.json()).user.username).toBe("maya_r");
+    expect(unverifiedMe.status).toBe(401);
+
+    const unverifiedLogin = await app.request(
+      "http://localhost/api/auth/login",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          identifier: "maya.r@vt.edu",
+          password: "correct horse battery staple",
+        }),
+      },
+      environment,
+    );
+    expect(unverifiedLogin.status).toBe(401);
+
+    const verification = await app.request(
+      "http://localhost/api/auth/verify-email",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: sentEmails[0].token }),
+      },
+      environment,
+    );
+    expect(verification.status).toBe(200);
+    expect(database.users[0].email_verified_at).not.toBeNull();
+
+    const usedVerification = await app.request(
+      "http://localhost/api/auth/verify-email",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: sentEmails[0].token }),
+      },
+      environment,
+    );
+    expect(usedVerification.status).toBe(400);
+
+    const invalidVerification = await app.request(
+      "http://localhost/api/auth/verify-email",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: "not-a-real-token" }),
+      },
+      environment,
+    );
+    expect(invalidVerification.status).toBe(400);
 
     const login = await app.request(
       "http://localhost/api/auth/login",
@@ -244,6 +373,17 @@ describe("authentication routes", () => {
       environment,
     );
     expect(login.status).toBe(200);
+    const session = sessionCookie(login);
+    expect(session.value).toContain("campusconnect_session=");
+    expect(session.header).toContain("HttpOnly");
+
+    const me = await app.request(
+      "http://localhost/api/auth/me",
+      { headers: { cookie: session.value } },
+      environment,
+    );
+    expect(me.status).toBe(200);
+    expect((await me.json()).user.username).toBe("maya_r");
 
     const invalidLogin = await app.request(
       "http://localhost/api/auth/login",
@@ -303,6 +443,104 @@ describe("authentication routes", () => {
     expect((await app.request("http://localhost/api/auth/signup", signupBody, environment)).status).toBe(409);
   });
 
+  it("invalidates older verification links when resending", async () => {
+    const database = new FakeDatabase();
+    const sentEmails: Array<{ email: string; token: string; userId: number }> = [];
+    const app = createApp({
+      createDatabaseClient: () => database.createClient(),
+      sendVerificationEmail: async (email) => {
+        sentEmails.push(email);
+      },
+    });
+    const environment = testEnvironment(database);
+
+    await app.request(
+      "http://localhost/api/auth/signup",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(validSignup()),
+      },
+      environment,
+    );
+    const originalToken = sentEmails[0].token;
+
+    const resend = await app.request(
+      "http://localhost/api/auth/resend-verification",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "MAYA.R@VT.EDU" }),
+      },
+      environment,
+    );
+    expect(resend.status).toBe(202);
+    expect(sentEmails).toHaveLength(2);
+
+    const unknownResend = await app.request(
+      "http://localhost/api/auth/resend-verification",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "unknown@vt.edu" }),
+      },
+      environment,
+    );
+    expect(unknownResend.status).toBe(202);
+    expect(sentEmails).toHaveLength(2);
+
+    const oldVerification = await app.request(
+      "http://localhost/api/auth/verify-email",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: originalToken }),
+      },
+      environment,
+    );
+    expect(oldVerification.status).toBe(400);
+
+    const activeToken = database.verificationTokens.find(
+      (token) => !token.usedAt,
+    );
+    expect(activeToken).toBeDefined();
+    if (activeToken) activeToken.createdAt = new Date(0);
+
+    const currentVerification = await app.request(
+      "http://localhost/api/auth/verify-email",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: sentEmails[1].token }),
+      },
+      environment,
+    );
+    expect(currentVerification.status).toBe(200);
+  });
+
+  it("keeps the account when sending the verification email fails", async () => {
+    const database = new FakeDatabase();
+    const app = createApp({
+      createDatabaseClient: () => database.createClient(),
+      sendVerificationEmail: async () => {
+        throw new Error("mail provider unavailable");
+      },
+    });
+    const response = await app.request(
+      "http://localhost/api/auth/signup",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(validSignup()),
+      },
+      testEnvironment(database),
+    );
+
+    expect(response.status).toBe(201);
+    expect(database.users).toHaveLength(1);
+    expect(database.verificationTokens).toHaveLength(1);
+  });
+
   it("rejects invalid, expired, and banned sessions", async () => {
     const database = new FakeDatabase();
     const app = createApp({ createDatabaseClient: () => database.createClient() });
@@ -321,6 +559,7 @@ describe("authentication routes", () => {
       credit_last_reset: new Date(),
       email_notifications_on: true,
       text_notifications_on: false,
+        email_verified_at: null,
       is_banned: true,
     });
 

@@ -31,6 +31,7 @@ export type DatabaseUserRow = {
   credit_last_reset: string | Date;
   email_notifications_on: boolean;
   text_notifications_on: boolean;
+  email_verified_at?: string | Date | null;
   password_hash?: string | null;
   is_banned?: boolean;
 };
@@ -41,11 +42,21 @@ export type SignupInput = {
   password: string;
   confirmPassword: string;
   phoneNumber: string | null;
+  emailNotificationsOn: boolean;
+  textNotificationsOn: boolean;
 };
 
 export type SignupValidation =
   | { ok: true; value: SignupInput }
   | { ok: false; fieldErrors: Record<string, string> };
+
+export type EmailVerificationTokenRow = {
+  token_id: number;
+  user_id: number;
+  token_hash: string;
+  created_at: string | Date;
+  used_at: string | Date | null;
+};
 
 function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -154,6 +165,10 @@ export async function createSessionToken(): Promise<string> {
   return bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
 }
 
+export async function createEmailVerificationToken(): Promise<string> {
+  return bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
+}
+
 export async function hashSessionToken(token: string): Promise<string> {
   const digest = new Uint8Array(
     await crypto.subtle.digest("SHA-256", encoder.encode(token)),
@@ -165,6 +180,10 @@ export async function hashSessionToken(token: string): Promise<string> {
   }
 
   return `\\x${hex}`;
+}
+
+export async function hashEmailVerificationToken(token: string): Promise<string> {
+  return hashSessionToken(token);
 }
 
 export function isVtEmail(email: string): boolean {
@@ -186,6 +205,9 @@ export function validateSignupInput(body: unknown): SignupValidation {
     typeof values.phoneNumber === "string" && values.phoneNumber.trim()
       ? values.phoneNumber.trim()
       : null;
+  const emailNotificationsOn =
+    values.emailNotificationsOn === undefined ? true : values.emailNotificationsOn === true;
+  const textNotificationsOn = values.textNotificationsOn === true && phoneNumber !== null;
   const fieldErrors: Record<string, string> = {};
 
   if (!/^[A-Za-z0-9_]{3,32}$/.test(username)) {
@@ -210,7 +232,15 @@ export function validateSignupInput(body: unknown): SignupValidation {
 
   return {
     ok: true,
-    value: { username, email, password, confirmPassword, phoneNumber },
+    value: {
+      username,
+      email,
+      password,
+      confirmPassword,
+      phoneNumber,
+      emailNotificationsOn,
+      textNotificationsOn,
+    },
   };
 }
 

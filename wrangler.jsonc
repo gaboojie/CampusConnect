@@ -29,7 +29,9 @@
 			],
 			"secrets": {
 				"required": [
-					"SESSION_SECRET"
+					"SESSION_SECRET",
+					"RESEND_API_KEY",
+					"RESEND_FROM_EMAIL"
 				]
 			},
 			"hyperdrive": [
@@ -61,7 +63,9 @@
 			},
 			"secrets": {
 				"required": [
-					"SESSION_SECRET"
+					"SESSION_SECRET",
+					"RESEND_API_KEY",
+					"RESEND_FROM_EMAIL"
 				]
 			},
 			"hyperdrive": [
