@@ -22,7 +22,8 @@
     "worker:deploy:production": "wrangler deploy --env production",
     "migrate": "tsx scripts/migrate.ts --environment dev",
     "migrate:dev": "tsx scripts/migrate.ts --environment dev",
-    "migrate:prod": "tsx scripts/migrate.ts --environment prod"
+    "migrate:prod": "tsx scripts/migrate.ts --environment prod",
+    "db:reset": "tsx scripts/reset-database.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261008.1",

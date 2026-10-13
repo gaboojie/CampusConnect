@@ -28,7 +28,7 @@
 --     later cancellations and no-shows are not refunded.
 --   * A cancellation caused by maintenance is always fully refunded.
 --   * Suspended (is_banned) accounts do not receive monthly resets.
---   Therefore, for every user: credit_balance = SUM(credittransaction.amount).
+--   Therefore, for every user: credit_balance = SUM("CreditTransaction".amount).
 --
 -- Explicit IDs are used so rows can reference each other; identity sequences
 -- are advanced at the end of this script.
@@ -39,7 +39,7 @@ BEGIN;
 -- -----------------------------------------------------------------------------
 -- ImageMetadata (synthetic metadata; no claim that these R2 objects exist)
 -- -----------------------------------------------------------------------------
-INSERT INTO imagemetadata (image_id, object_key, content_type, size, width, height, alt_text, status, uploaded_at, filename) VALUES
+INSERT INTO "ImageMetadata" (image_id, object_key, content_type, size, width, height, alt_text, status, uploaded_at, filename) VALUES
     (1, 'resources/4/newman-group-study-4.jpg', 'image/jpeg', 412388, 1600, 1067, 'Group study room with a table, chairs, and a wall display', 'ready', '2026-08-14 10:05:00', 'newman_study_room_4.jpg'),
     (2, 'resources/10/mccomas-court-1.jpg', 'image/jpeg', 538904, 1920, 1080, 'Indoor basketball court with hardwood floor', 'ready', '2026-08-14 10:20:00', 'mccomas_court1.jpg'),
     (3, 'resources/12/mccomas-lap-lane-1.jpg', 'image/jpeg', 466120, 1920, 1080, 'Lap lane in an indoor pool', 'ready', '2026-08-14 10:30:00', 'pool_lane1.jpg'),
@@ -54,7 +54,7 @@ INSERT INTO imagemetadata (image_id, object_key, content_type, size, width, heig
 -- User (fictional accounts; example.com addresses; 555-01xx fictional phone numbers)
 -- credit_balance and credit_last_reset are derived from the credit timeline.
 -- -----------------------------------------------------------------------------
-INSERT INTO "user" (user_id, username, email, phone_number, role, created_at, credit_balance, credit_last_reset, is_banned, can_add_resources, email_notifications_on, text_notifications_on, profile_image_id) VALUES
+INSERT INTO "User" (user_id, username, email, phone_number, role, created_at, credit_balance, credit_last_reset, is_banned, can_add_resources, email_notifications_on, text_notifications_on, profile_image_id) VALUES
     -- Owner account
     (1, 'cc_admin', 'cc.admin@example.com', NULL, 'admin', '2026-08-10 09:00:00', 20, '2026-10-01', FALSE, TRUE, TRUE, FALSE, NULL),
     -- Owner account
@@ -96,7 +96,7 @@ INSERT INTO "user" (user_id, username, email, phone_number, role, created_at, cr
 -- Building (names, addresses, coordinates from official vt.edu building pages)
 -- google_place_id is NULL: no Place ID was verified.
 -- -----------------------------------------------------------------------------
-INSERT INTO building (building_id, building_name, address, latitude, longitude, google_place_id) VALUES
+INSERT INTO "Building" (building_id, building_name, address, latitude, longitude, google_place_id) VALUES
     (1, 'Carol M. Newman Library', '560 Drillfield Drive, Blacksburg, VA 24061', '37.228760', '-80.419240', NULL),
     (2, 'Torgersen Hall', '620 Drillfield Drive, Blacksburg, VA 24061', '37.229780', '-80.419970', NULL),
     (3, 'McComas Hall', '895 Washington St. SW, Blacksburg, VA 24061', '37.220690', '-80.422300', NULL),
@@ -106,7 +106,7 @@ INSERT INTO building (building_id, building_name, address, latitude, longitude, 
 -- -----------------------------------------------------------------------------
 -- ResourceCategory
 -- -----------------------------------------------------------------------------
-INSERT INTO resourcecategory (category_id, category_name, description) VALUES
+INSERT INTO "ResourceCategory" (category_id, category_name, description) VALUES
     (1, 'Group Study Room', 'Enclosed rooms for small-group study and project work.'),
     (2, 'Meeting Room', 'Bookable rooms for student organization meetings, project teams, and presentations.'),
     (3, 'Indoor Court', 'Indoor hardwood courts for basketball, volleyball, badminton, or pickleball.'),
@@ -120,7 +120,7 @@ INSERT INTO resourcecategory (category_id, category_name, description) VALUES
 -- Coordinates repeat the building's official coordinates; room-level
 -- positions were not verified. Credits and capacities are fictional.
 -- -----------------------------------------------------------------------------
-INSERT INTO resource (resource_id, owner_id, building_id, category_id, name, description, location_description, latitude, longitude, max_reservation_time, required_credits, capacity, created_at, resource_image_id) VALUES
+INSERT INTO "Resource" (resource_id, owner_id, building_id, category_id, name, description, location_description, latitude, longitude, max_reservation_time, required_credits, capacity, created_at, resource_image_id) VALUES
     (1, 2, 1, 1, 'Newman Group Study Room 1', 'Small group study room with a whiteboard and table seating for four.', 'Fourth floor, group study room area', '37.228760', '-80.419240', '2 hours', 2, 4, '2026-08-13 10:00:00', NULL),
     (2, 2, 1, 1, 'Newman Group Study Room 2', 'Small group study room with a whiteboard and table seating for four.', 'Fourth floor, group study room area', '37.228760', '-80.419240', '2 hours', 2, 4, '2026-08-13 10:00:00', NULL),
     (3, 2, 1, 1, 'Newman Group Study Room 3', 'Mid-size group study room with a whiteboard and wall-mounted display.', 'Fourth floor, group study room area', '37.228760', '-80.419240', '2 hours', 2, 6, '2026-08-13 10:00:00', NULL),
@@ -147,7 +147,7 @@ INSERT INTO resource (resource_id, owner_id, building_id, category_id, name, des
 -- -----------------------------------------------------------------------------
 -- ResourceFeature
 -- -----------------------------------------------------------------------------
-INSERT INTO resourcefeature (feature_id, resource_id, feature_name, description) VALUES
+INSERT INTO "ResourceFeature" (feature_id, resource_id, feature_name, description) VALUES
     (1, 1, 'Whiteboard', 'Wall-mounted whiteboard with markers.'),
     (2, 1, 'Power station', 'Power outlets for charging laptops and phones.'),
     (3, 2, 'Whiteboard', 'Wall-mounted whiteboard with markers.'),
@@ -179,7 +179,7 @@ INSERT INTO resourcefeature (feature_id, resource_id, feature_name, description)
 -- A window runs start_time..end_time and repeats every repeats_offset until
 -- repeats_until. Squires rooms are weekday-only: one weekly row per weekday.
 -- -----------------------------------------------------------------------------
-INSERT INTO resourceavailability (availability_id, resource_id, start_time, end_time, repeats_until, repeats_offset) VALUES
+INSERT INTO "ResourceAvailability" (availability_id, resource_id, start_time, end_time, repeats_until, repeats_offset) VALUES
     (1, 1, '2026-08-17 08:00:00', '2026-08-17 23:00:00', '2026-12-18 23:00:00', '1 day'),
     (2, 2, '2026-08-17 08:00:00', '2026-08-17 23:00:00', '2026-12-18 23:00:00', '1 day'),
     (3, 3, '2026-08-17 08:00:00', '2026-08-17 23:00:00', '2026-12-18 23:00:00', '1 day'),
@@ -214,7 +214,7 @@ INSERT INTO resourceavailability (availability_id, resource_id, start_time, end_
 -- -----------------------------------------------------------------------------
 -- MaintenancePeriod (simulated)
 -- -----------------------------------------------------------------------------
-INSERT INTO maintenanceperiod (maintenance_id, resource_id, start_time, end_time, reason) VALUES
+INSERT INTO "MaintenancePeriod" (maintenance_id, resource_id, start_time, end_time, reason) VALUES
     (1, 11, '2026-08-17 07:00:00', '2026-08-19 22:00:00', 'Court floor refinishing before the fall semester.'),
     (2, 3, '2026-09-02 08:00:00', '2026-09-02 12:00:00', 'Replacing the wall-mounted display bracket.'),
     (3, 12, '2026-09-14 07:00:00', '2026-09-16 22:00:00', 'Pool water treatment and lane line inspection.'),
@@ -226,7 +226,7 @@ INSERT INTO maintenanceperiod (maintenance_id, resource_id, start_time, end_time
 -- Reservation
 -- Status values: completed, confirmed (upcoming), cancelled, no_show.
 -- -----------------------------------------------------------------------------
-INSERT INTO reservation (reservation_id, user_id, resource_id, start_time, end_time, status, created_at) VALUES
+INSERT INTO "Reservation" (reservation_id, user_id, resource_id, start_time, end_time, status, created_at) VALUES
     -- Journey A (maya_r)
     (1, 6, 4, '2026-09-03 18:00:00', '2026-09-03 20:00:00', 'completed', '2026-09-01 14:20:00'),
     -- Journey A (maya_r)
@@ -301,7 +301,7 @@ INSERT INTO reservation (reservation_id, user_id, resource_id, start_time, end_t
 -- -----------------------------------------------------------------------------
 -- CreditTransaction (derived: balance = SUM(amount) per user)
 -- -----------------------------------------------------------------------------
-INSERT INTO credittransaction (transaction_id, user_id, amount, transaction_type, created_at) VALUES
+INSERT INTO "CreditTransaction" (transaction_id, user_id, amount, transaction_type, created_at) VALUES
     (1, 1, 20, 'initial_grant', '2026-08-10 09:00:00'),
     (2, 2, 20, 'initial_grant', '2026-08-10 10:30:00'),
     (3, 3, 20, 'initial_grant', '2026-08-11 09:15:00'),
@@ -411,7 +411,7 @@ INSERT INTO credittransaction (transaction_id, user_id, amount, transaction_type
 -- -----------------------------------------------------------------------------
 -- Notification
 -- -----------------------------------------------------------------------------
-INSERT INTO notification (notification_id, user_id, message, notification_type, created_at) VALUES
+INSERT INTO "Notification" (notification_id, user_id, message, notification_type, created_at) VALUES
     (1, 1, 'Welcome to CampusConnect! 20 credits have been added to your account.', 'account', '2026-08-10 09:00:00'),
     (2, 2, 'Welcome to CampusConnect! 20 credits have been added to your account.', 'account', '2026-08-10 10:30:00'),
     (3, 3, 'Welcome to CampusConnect! 20 credits have been added to your account.', 'account', '2026-08-11 09:15:00'),
@@ -526,7 +526,7 @@ INSERT INTO notification (notification_id, user_id, message, notification_type, 
 -- ReservationReview: the reserving student reviews the resource owner.
 -- Only completed reservations are reviewed; created after the reservation ends.
 -- -----------------------------------------------------------------------------
-INSERT INTO reservationreview (reservation_id, reviewer_user_id, reviewee_user_id, rating, reason, created_at, is_anonymous_review) VALUES
+INSERT INTO "ReservationReview" (reservation_id, reviewer_user_id, reviewee_user_id, rating, reason, created_at, is_anonymous_review) VALUES
     (1, 6, 2, 5, 'Room was unlocked and ready on time. Booking was easy.', '2026-09-03 21:18:00', FALSE),
     (4, 8, 2, 5, 'Everything matched the listing.', '2026-08-27 19:00:00', FALSE),
     (6, 8, 3, 4, 'Court was set up when we arrived, but the net was not.', '2026-09-10 22:36:00', FALSE),
@@ -545,7 +545,7 @@ INSERT INTO reservationreview (reservation_id, reviewer_user_id, reviewee_user_i
 -- -----------------------------------------------------------------------------
 -- ResourceReview: written by users who completed a reservation of that resource.
 -- -----------------------------------------------------------------------------
-INSERT INTO resourcereview (review_id, resource_id, reviewer_user_id, rating, reason, created_at, is_anonymous_review) VALUES
+INSERT INTO "ResourceReview" (review_id, resource_id, reviewer_user_id, rating, reason, created_at, is_anonymous_review) VALUES
     -- reservation 1
     (1, 4, 6, 5, 'Quiet room with plenty of space. Great for our group study session.', '2026-09-03 21:12:00', FALSE),
     -- reservation 4
@@ -598,7 +598,7 @@ INSERT INTO resourcereview (review_id, resource_id, reviewer_user_id, rating, re
 -- -----------------------------------------------------------------------------
 -- Session (synthetic SHA-256 token hashes; sessions last 7 days)
 -- -----------------------------------------------------------------------------
-INSERT INTO session (session_id, user_id, token_hash, created_at, expires_at) VALUES
+INSERT INTO "Session" (session_id, user_id, token_hash, created_at, expires_at) VALUES
     (1, 1, '\x9a1ec3f58ae63d1d52ea999df62dae6afdcd826618b826520f0cd4a276dbaab7', '2026-08-10 09:00:00', '2026-08-17 09:00:00'),
     (2, 2, '\xb7c20a13412507534f60f169e8aad4246faab4ce97a886f0fb51500a4162cbc4', '2026-08-10 10:30:00', '2026-08-17 10:30:00'),
     (3, 3, '\xae314f6e25b2ef9289cc476b60008bd2bbb1cff770894ef5a26a5ebe63ac3d7a', '2026-08-11 09:15:00', '2026-08-18 09:15:00'),
@@ -637,19 +637,19 @@ INSERT INTO session (session_id, user_id, token_hash, created_at, expires_at) VA
 -- -----------------------------------------------------------------------------
 DO $$
 BEGIN
-    PERFORM setval(pg_get_serial_sequence('imagemetadata', 'image_id'), (SELECT MAX(image_id) FROM imagemetadata));
-    PERFORM setval(pg_get_serial_sequence('"user"', 'user_id'), (SELECT MAX(user_id) FROM "user"));
-    PERFORM setval(pg_get_serial_sequence('building', 'building_id'), (SELECT MAX(building_id) FROM building));
-    PERFORM setval(pg_get_serial_sequence('resourcecategory', 'category_id'), (SELECT MAX(category_id) FROM resourcecategory));
-    PERFORM setval(pg_get_serial_sequence('resource', 'resource_id'), (SELECT MAX(resource_id) FROM resource));
-    PERFORM setval(pg_get_serial_sequence('resourcefeature', 'feature_id'), (SELECT MAX(feature_id) FROM resourcefeature));
-    PERFORM setval(pg_get_serial_sequence('resourceavailability', 'availability_id'), (SELECT MAX(availability_id) FROM resourceavailability));
-    PERFORM setval(pg_get_serial_sequence('maintenanceperiod', 'maintenance_id'), (SELECT MAX(maintenance_id) FROM maintenanceperiod));
-    PERFORM setval(pg_get_serial_sequence('reservation', 'reservation_id'), (SELECT MAX(reservation_id) FROM reservation));
-    PERFORM setval(pg_get_serial_sequence('credittransaction', 'transaction_id'), (SELECT MAX(transaction_id) FROM credittransaction));
-    PERFORM setval(pg_get_serial_sequence('notification', 'notification_id'), (SELECT MAX(notification_id) FROM notification));
-    PERFORM setval(pg_get_serial_sequence('resourcereview', 'review_id'), (SELECT MAX(review_id) FROM resourcereview));
-    PERFORM setval(pg_get_serial_sequence('session', 'session_id'), (SELECT MAX(session_id) FROM session));
+    PERFORM setval(pg_get_serial_sequence('"ImageMetadata"', 'image_id'), (SELECT MAX(image_id) FROM "ImageMetadata"));
+    PERFORM setval(pg_get_serial_sequence('"User"', 'user_id'), (SELECT MAX(user_id) FROM "User"));
+    PERFORM setval(pg_get_serial_sequence('"Building"', 'building_id'), (SELECT MAX(building_id) FROM "Building"));
+    PERFORM setval(pg_get_serial_sequence('"ResourceCategory"', 'category_id'), (SELECT MAX(category_id) FROM "ResourceCategory"));
+    PERFORM setval(pg_get_serial_sequence('"Resource"', 'resource_id'), (SELECT MAX(resource_id) FROM "Resource"));
+    PERFORM setval(pg_get_serial_sequence('"ResourceFeature"', 'feature_id'), (SELECT MAX(feature_id) FROM "ResourceFeature"));
+    PERFORM setval(pg_get_serial_sequence('"ResourceAvailability"', 'availability_id'), (SELECT MAX(availability_id) FROM "ResourceAvailability"));
+    PERFORM setval(pg_get_serial_sequence('"MaintenancePeriod"', 'maintenance_id'), (SELECT MAX(maintenance_id) FROM "MaintenancePeriod"));
+    PERFORM setval(pg_get_serial_sequence('"Reservation"', 'reservation_id'), (SELECT MAX(reservation_id) FROM "Reservation"));
+    PERFORM setval(pg_get_serial_sequence('"CreditTransaction"', 'transaction_id'), (SELECT MAX(transaction_id) FROM "CreditTransaction"));
+    PERFORM setval(pg_get_serial_sequence('"Notification"', 'notification_id'), (SELECT MAX(notification_id) FROM "Notification"));
+    PERFORM setval(pg_get_serial_sequence('"ResourceReview"', 'review_id'), (SELECT MAX(review_id) FROM "ResourceReview"));
+    PERFORM setval(pg_get_serial_sequence('"Session"', 'session_id'), (SELECT MAX(session_id) FROM "Session"));
 END
 $$;
 

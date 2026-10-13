@@ -95,6 +95,7 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
 - `migrations/dev/` contains SQL for Neon `dev` and is applied manually by the owner when the shared dev schema changes.
 - `migrations/prod/` contains production-safe SQL for Neon `main` and runs separately with `npm run migrate:prod`.
 - `scripts/migrate.ts` applies files in order and records applied versions in `schema_migrations`.
+- `scripts/reset-database.ts` can drop all tables in the selected database after an exact confirmation prompt. Use it only for an intentional reset.
 - Never run dev migrations against Neon `main` or production migrations against Neon `dev` without reviewing them.
 - The production GitHub Action never runs database migrations. A designated maintainer must run production migrations separately after review, a restore point, and explicit approval.
 - The designated maintainer can run a production migration from a secure terminal with `npm run migrate:prod -- --database-url "$DATABASE_URL"`, then unset `DATABASE_URL`.
@@ -103,6 +104,17 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
 - `.env.prod.example` documents the migration-only `DATABASE_URL`.
 - `SESSION_SECRET` is a Cloudflare Worker secret, not a value in `wrangler.jsonc` or the frontend.
 - `wrangler.jsonc` contains non-secret environment values, R2 bucket names, Hyperdrive IDs, and Worker settings.
+
+To reset the dev database, load `.env.dev` and confirm the prompt:
+
+```sh
+set -a
+source .env.dev
+set +a
+npm run db:reset -- --environment dev
+```
+
+To reset production, use `.env.prod` and type `RESET PROD` when prompted. Verify the Neon branch and database before confirming.
 
 ## Project structure
 
