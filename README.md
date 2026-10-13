@@ -105,6 +105,7 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
 
 - `migrations/dev/` contains SQL for Neon `dev` and is applied manually by the owner when the shared dev schema changes.
 - `migrations/prod/` contains production-safe SQL for Neon `main` and runs separately with `npm run migrate:prod`.
+- Each environment currently has two files: `001_init.sql` creates the complete schema, and `002_seed.sql` inserts the synthetic grading/demo data.
 - `scripts/migrate.ts` applies files in order and records applied versions in `schema_migrations`.
 - Before running dev migrations, load `.env.dev`; `npm run migrate:dev` uses `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` for the connection. For example:
 
@@ -116,6 +117,7 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
   ```
 
 - `scripts/reset-database.ts` can drop all tables in the selected database after an exact confirmation prompt. Use it only for an intentional reset.
+- The consolidated migration names are intended for a fresh database. If a database already has the older migration history (`001_schema`, `002_seed`, `003_authentication`, or `004_email_verification`), reset that database before applying the new two-file set.
 - Never run dev migrations against Neon `main` or production migrations against Neon `dev` without reviewing them.
 - The production GitHub Action never runs database migrations. A designated maintainer must run production migrations separately after review, a restore point, and explicit approval.
 - The designated maintainer can run a production migration from a secure terminal with `npm run migrate:prod -- --database-url "$DATABASE_URL"`, then unset `DATABASE_URL`.

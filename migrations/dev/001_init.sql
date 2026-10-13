@@ -24,7 +24,6 @@
 --     object or nothing.
 -- =============================================================================
 
-
 -- -----------------------------------------------------------------------------
 -- ImageMetadata: Cloudflare R2 object metadata for profile and resource images.
 -- Everything is NOT NULL except alt_text (Phase 3 section 1).
