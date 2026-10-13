@@ -105,6 +105,19 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
 - `SESSION_SECRET` is a Cloudflare Worker secret, not a value in `wrangler.jsonc` or the frontend.
 - `wrangler.jsonc` contains non-secret environment values, R2 bucket names, Hyperdrive IDs, and Worker settings.
 
+## Authentication prototype
+
+The public landing page provides login and signup for `@vt.edu` addresses. New accounts receive a seven-day, HttpOnly session cookie backed by the `"Session"` table. Existing seeded accounts do not have passwords yet and cannot log in.
+
+The authentication API is:
+
+- `POST /api/auth/signup`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+
+Operational health and smoke-test endpoints remain public. Other `/api/*` requests require a valid session.
+
 To reset the dev database, load `.env.dev` and confirm the prompt:
 
 ```sh
@@ -123,6 +136,8 @@ src/                         Svelte frontend
 src/App.svelte               Environment-aware R2/database integration page
 src/app.css                  Frontend styles
 worker/index.ts              Hono Worker API, health check, and asset fallback
+worker/auth.ts               Password, session-token, and signup validation helpers
+worker/db.ts                 Testable PostgreSQL client lifecycle helper
 tests/                       Vitest application smoke tests
 migrations/dev/              Development SQL migrations
 migrations/prod/             Production SQL migrations
