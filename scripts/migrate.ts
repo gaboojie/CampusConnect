@@ -21,15 +21,16 @@ function getMigrationEnvironment(): MigrationEnvironment {
   );
 }
 
-function getDatabaseUrl(): string {
+function getDatabaseUrl(environment: MigrationEnvironment): string {
   const databaseUrlIndex = process.argv.indexOf("--database-url");
   const databaseUrlFromArgs =
     databaseUrlIndex >= 0 ? process.argv[databaseUrlIndex + 1] : undefined;
-  const databaseUrl = databaseUrlFromArgs ?? process.env.DATABASE_URL;
+  const environmentVariable = "CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB";
+  const databaseUrl = databaseUrlFromArgs ?? process.env[environmentVariable];
 
   if (!databaseUrl || databaseUrl.startsWith("--")) {
     throw new Error(
-      "Provide a database URL with --database-url or the DATABASE_URL environment variable.",
+      `Set ${environmentVariable} or provide --database-url before running ${environment} migrations.`,
     );
   }
 
@@ -39,7 +40,7 @@ function getDatabaseUrl(): string {
 async function main(): Promise<void> {
   const environment = getMigrationEnvironment();
   const migrationsDirectory = join(projectRoot, "migrations", environment);
-  const client = new Client({ connectionString: getDatabaseUrl() });
+  const client = new Client({ connectionString: getDatabaseUrl(environment) });
   await client.connect();
 
   try {

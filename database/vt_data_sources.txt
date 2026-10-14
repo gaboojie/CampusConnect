@@ -1,0 +1,265 @@
+CampusConnect - Phase 4 Seed Data: Sources, Assumptions, and AI Use
+====================================================================
+
+Files covered : database/seed.sql (loaded after database/schema.sql)
+Snapshot date : 2026-10-11 12:00 (America/New_York local time)
+Sources accessed: 2026-10-11
+
+Labels used in this file
+  VERIFIED   - taken from an official Virginia Tech web page listed below.
+  SIMULATED  - invented for CampusConnect. Not a Virginia Tech fact, room
+               number, policy, or price.
+  ASSUMPTION - a project rule we chose because the Phase 3 documents do
+               not define it.
+
+
+1. REAL-WORLD SOURCES
+---------------------
+
+[S1] "Carol M. Newman Library | Virginia Tech"
+     https://www.vt.edu/about/locations/buildings/newman-library.html
+     Used: building name, street address (560 Drillfield Drive),
+           coordinates (37.22876, -80.41924), note that Newman has floors
+           designated for group work.
+
+[S2] "Study Spaces | University Libraries | Virginia Tech"
+     https://lib.vt.edu/study-learn/study-spaces.html
+     Used: group study rooms are on the 4th floor of Newman and are
+           bookable; VT limits group study room reservations to 2 hours
+           total per person per day; all spaces have power stations.
+
+[S3] "Torgersen Hall | Virginia Tech"
+     https://www.vt.edu/about/locations/buildings/torgersen-hall.html
+     Used: building name, street address (620 Drillfield Drive),
+           coordinates (37.22978, -80.41997), first-floor atrium described
+           as an "electronic study court", building has classrooms and
+           offices.
+
+[S4] "McComas Hall | Virginia Tech"
+     https://www.vt.edu/about/locations/buildings/mccomas-hall.html
+     Used: building name, street address (895 Washington St. SW),
+           coordinates (37.22069, -80.4223).
+
+[S5] "McComas Hall | Recreational Sports | Virginia Tech"
+     https://recsports.vt.edu/facilities/mccomas.html
+     Used: 3 basketball/volleyball courts, 3 fitness studios
+           (2 multipurpose, 1 spin), 25-yard 8-lane pool, facility
+           reservations exist through Recreational Sports.
+
+[S6] "War Memorial Hall | Virginia Tech"
+     https://www.vt.edu/about/locations/buildings/war-memorial-hall.html
+     Used: building name, street address (370 Drillfield Drive),
+           coordinates (37.22629, -80.42059), five racquetball courts,
+           one squash court, yoga studio, table tennis space.
+
+[S7] "War Memorial Hall | Recreational Sports | Virginia Tech"
+     https://recsports.vt.edu/facilities/warmemorial.html
+     Used: 4 basketball/volleyball courts convertible to 8
+           badminton/pickleball courts, 2 table tennis facilities, yoga
+           studio, 5 racquetball courts, 1 squash court.
+
+[S8] "Squires Student Center | Virginia Tech"
+     https://www.vt.edu/about/locations/buildings/squires-student-center.html
+     Used: building name, street address (290 College Ave.),
+           coordinates (37.22962, -80.41796), building contains meeting
+           rooms and activity rooms.
+
+Address format: the street address is copied from the source and
+", Blacksburg, VA 24061" is appended. That city/ZIP suffix appears on
+[S5] and [S7] for the RecSports buildings; for Newman, Torgersen, and
+Squires it is an assumption based on the shared campus ZIP code.
+
+
+2. BUILDINGS (table: building)
+------------------------------
+
+Building                 Address source  Coordinates  Coordinate status
+-----------------------  --------------  -----------  ---------------------
+Carol M. Newman Library  [S1]            [S1]         As published by VT
+Torgersen Hall           [S3]            [S3]         As published by VT
+McComas Hall             [S4]            [S4]         As published by VT
+War Memorial Hall        [S6]            [S6]         As published by VT
+Squires Student Center   [S8]            [S8]         As published by VT
+
+- Each coordinate is the single building-level point on the official page.
+  It is not a room-level or entrance-level position.
+- google_place_id is NULL for every building. No Google Place ID was
+  verified, so none was entered.
+
+
+3. RESOURCES (tables: resource, resourcefeature, resourceavailability,
+   maintenanceperiod, resourcecategory)
+--------------------------------------------------------------------
+
+What is VERIFIED is only that each kind of facility exists in that building:
+
+  Newman group study rooms (4th floor) .................... [S1][S2]
+  Torgersen atrium study court ............................ [S3]
+  McComas basketball/volleyball courts, pool, studios ..... [S4][S5]
+  War Memorial racquetball/squash courts, badminton/
+    pickleball layouts, table tennis, yoga studio ......... [S6][S7]
+  Squires meeting rooms ................................... [S8]
+
+Everything else is SIMULATED:
+  - Resource names such as "Newman Group Study Room 4", "Torgersen Project
+    Room 1", or "Squires Meeting Room A". These are CampusConnect labels,
+    not official Virginia Tech room numbers or names.
+  - Torgersen Project Rooms 1-2 are fictional. VT does not list them as
+    reservable spaces.
+  - Capacities, required_credits, max_reservation_time, descriptions,
+    and location_description text.
+  - Resource latitude/longitude: copied from the parent building's
+    official coordinates. Room-level positions are not verified.
+  - Resource features (whiteboards, displays, projectors, nets, mats).
+    The only exception is "Power station" in Newman rooms, which follows
+    [S2].
+  - Availability windows, the Fall 2026 range 2026-08-17 to 2026-12-18,
+    and the hours: Newman 08:00-23:00, Torgersen 08:00-22:00, RecSports
+    07:00-22:00, Squires weekdays 09:00-21:00. These are NOT official VT
+    operating hours.
+  - All six maintenance periods and their reasons.
+  - Resource categories (names and descriptions).
+  - Owner accounts. Resources belong to fictional staff accounts, not to
+    real VT departments or employees.
+
+The 2-hour max_reservation_time on Newman study rooms mirrors VT's
+2-hours-per-day rule [S2]. CampusConnect applies it per reservation, not
+per person per day, so it is an approximation, not VT policy.
+
+Real reservations at these facilities go through VT's own systems
+(bookings.lib.vt.edu for Libraries [S2], the RecSports reservations page
+[S5]). CampusConnect data does not represent those systems.
+
+
+4. USERS, SESSIONS, AND IMAGES
+------------------------------
+
+Users ("user"), all SIMULATED:
+  - Usernames are fictional (e.g. maya_r, recsports_mccomas_tj) and do not
+    identify real people.
+  - Emails use the reserved example.com domain (RFC 2606).
+  - Phone numbers use the fictional +1-540-555-0100..0199 range.
+  - Roles: 'admin' (1), 'staff' (4, the resource owners), 'student' (20).
+  - ryan_f is suspended (is_banned = TRUE) after two no-shows.
+  - sam_q joined on 2026-10-09 and has no reservations yet.
+
+Sessions (session), SIMULATED:
+  - token_hash is SHA-256 of a synthetic string (not a real login token).
+  - Sessions last 7 days; 15 are active at the snapshot and 16 expired.
+
+Images (imagemetadata), SIMULATED:
+  - Object keys, file names, sizes, and dimensions are invented.
+  - These objects are NOT claimed to exist in Cloudflare R2.
+
+
+5. CREDIT, CANCELLATION, AND REFUND RULES (ASSUMPTIONS)
+-------------------------------------------------------
+The Phase 3 documentation defines credit columns but no credit, refund, or
+cancellation policy. seed.sql uses these ASSUMED rules:
+
+  a. New account: +20 credits (transaction_type 'initial_grant').
+  b. Monthly reset on the 1st at 00:00: the balance returns to 20 and
+     unused credits do not roll over. A 'monthly_reset' row stores the
+     top-up amount and is only written when the balance changes;
+     credit_last_reset is still updated. Suspended accounts do not
+     receive resets.
+  c. Booking deducts the resource's required_credits once, as a flat
+     charge per reservation, not per hour ('reservation_charge').
+  d. A user who cancels at least 24 hours before the start gets a full
+     refund ('refund'). Cancelling less than 24 hours ahead gets no refund.
+  e. A reservation cancelled because of maintenance is fully refunded.
+  f. No-shows are not refunded.
+  g. Transaction amounts are signed: credits added are positive,
+     deductions negative. So for every user,
+     credit_balance = SUM(credittransaction.amount).
+  h. Credit amounts and prices are fictional and are not Virginia Tech
+     prices or fees.
+
+
+6. SIMULATED ACTIVITY
+---------------------
+
+Reservations: 55 total.
+  - 38 completed, 11 confirmed (upcoming), 4 cancelled, 2 no_show.
+  - Status meanings: 'confirmed' = upcoming; 'completed' = used;
+    'cancelled' = cancelled by the user or due to maintenance;
+    'no_show' = past and not used.
+  - A reservation that starts after the snapshot is 'confirmed'.
+
+Generation constraints (all checked when the data was produced):
+  - Active reservations do not overlap on the same resource.
+  - Active reservations do not overlap a maintenance period.
+  - Every reservation fits inside an availability window.
+  - No reservation exceeds max_reservation_time.
+  - Each reservation is created after the user's account and before its
+    start time.
+  - No balance ever goes negative.
+
+The four main journeys:
+  A  maya_r   Books Newman Group Study Room 4, completes it, leaves a
+              5-star resource review and a review of the owner; has an
+              upcoming booking.
+  B  liam_k   Books Squires Meeting Room A, cancels 3 days ahead, and is
+              refunded in full.
+  C  priya_s  Uses six resources across four buildings over seven weeks,
+              with three resource reviews and one reservation review.
+  D  diego_m  Pool lane booking cancelled by scheduled maintenance and
+              refunded; rebooks, completes, then plays squash.
+
+Reviews:
+  - ResourceReview: written only by users who completed a reservation of
+    that resource, after it ended.
+  - ReservationReview: only for completed reservations. The reserving
+    student is the reviewer and the resource owner is the reviewee
+    (ASSUMPTION; see section 7).
+  - All review text is fictional.
+
+Notifications:
+  - Generated from the same timeline: welcome, credit reset, booking
+    confirmation, cancellation (with refund outcome), no-show, and account
+    suspension.
+
+Events the schema cannot store: no column records when or why a
+reservation was cancelled, when a maintenance period was announced, or
+why a user was banned. In seed.sql these facts appear only in the timing
+of credit transactions and notifications, and in the notification
+message text.
+
+
+7. LIMITATIONS AND OPEN QUESTIONS
+---------------------------------
+- Credit, refund, and cancellation rules (section 5) are not in the
+  Phase 3 documents and need team confirmation.
+- ReservationReview direction: the schema stores one reviewer and one
+  reviewee per reservation but does not say who reviews whom. We chose
+  reserving student -> resource owner. The schema allows only one
+  ReservationReview per reservation, so two-way reviews are impossible.
+- Allowed values of role, reservation status, image status,
+  transaction_type, and notification_type are not documented. The values
+  used here are our choices.
+- Timestamps are timestamp without time zone and are interpreted as
+  Blacksburg local time.
+- The DBML spells Resource.descripton; schema.sql (and this seed) use
+  "description".
+- Building coordinates are VT's building-level points. Room coordinates
+  are not available.
+- Monthly resets are stored as precomputed rows. No database job performs
+  them.
+
+
+8. USE OF GENERATIVE AI
+-----------------------
+This seed data was produced with Claude Code (Anthropic, model Claude
+Opus 5.5) on 2026-10-11:
+  - It fetched the official pages listed in section 1 and extracted the
+    building facts.
+  - It wrote a deterministic Python generator. The generator derives
+    credit transactions, balances, notifications, and sessions from a
+    single reservation timeline and checks the constraints in section 6
+    before writing seed.sql.
+  - It wrote all fictional names, descriptions, review text, and
+    notification text.
+  - It ran schema.sql and seed.sql on a temporary local PostgreSQL 18
+    database to check that they load and that balances reconcile.
+
+The team should review the generated content before submission.

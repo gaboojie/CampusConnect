@@ -27,7 +27,8 @@ _Authors: Faria Binta Awal, Ashwaq Alaklabi, Rokeshuvaraj Nagarajan, & Gabriel J
 
 4. Ask the project owner for access to the Cloudflare account and Neon project. Use the Neon `dev` branch only.
 5. Fill `.env.dev` with:
-   - `SESSION_SECRET`: a local-only value - generate one with `openssl rand -hex 32`.
+   - `RESEND_API_KEY`: the development-only Resend sending key.
+   - `RESEND_FROM_EMAIL`: a verified development sender address.
    - `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB`: the Neon `dev` branch connection string with TLS enabled. It must have the pooled option as unselected.
 6. Authenticate Wrangler, which is used to speak with Cloudflare (you need a Cloudflare account):
 
@@ -68,7 +69,7 @@ Production releases follow this procedure:
 3. Wait for the validation status check to pass and obtain the required review.
 4. Merge the pull request. Direct pushes to `main` are disabled.
 5. The merge creates a push to `main`, which starts `.github/workflows/ci-cd.yml`.
-6. The workflow validates the project, deploys the production Worker, and runs health and integration smoke checks. It does not modify the production database.
+6. The workflow validates the project, deploys the production Worker, and checks the Neon database health endpoint. It does not modify the production database.
 7. Confirm the workflow succeeds and verify the production site.
 
 Configure the GitHub `production` environment with a required reviewer and these secrets:
@@ -82,7 +83,14 @@ Add this environment variable:
 APP_ORIGIN=https://campusconnect-production.vt-campusconnect.workers.dev
 ```
 
-Set `SESSION_SECRET` directly on the production Worker with Wrangler. It is not a GitHub Actions variable and is never passed to the frontend.
+Set the production Resend values directly on the production Worker as well:
+
+```sh
+npx wrangler secret put RESEND_API_KEY --env production
+npx wrangler secret put RESEND_FROM_EMAIL --env production
+```
+
+Use a separate sending key and sender for local development. Do not use a production Resend key in `.env.dev`.
 
 The production site is:
 
@@ -94,28 +102,77 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
 
 - `migrations/dev/` contains SQL for Neon `dev` and is applied manually by the owner when the shared dev schema changes.
 - `migrations/prod/` contains production-safe SQL for Neon `main` and runs separately with `npm run migrate:prod`.
+- Each environment currently has two files: `001_init.sql` creates the complete schema, and `002_seed.sql` inserts the synthetic grading/demo data.
 - `scripts/migrate.ts` applies files in order and records applied versions in `schema_migrations`.
+- Before running dev migrations, load `.env.dev`; `npm run migrate:dev` uses `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` for the connection. For example:
+
+  ```sh
+  set -a
+  source .env.dev
+  set +a
+  npm run migrate:dev
+  ```
+
+- `scripts/reset-database.ts` can drop all tables in the selected database after an exact confirmation prompt. Use it only for an intentional reset.
+- Both dev and prod database commands use `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB`. For production, load `.env.prod` with the Neon `main` connection string before running the command:
+
+  ```sh
+  set -a
+  source .env.prod
+  set +a
+  npm run migrate:prod
+  unset CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB
+  ```
+
+- The consolidated migration names are intended for a fresh database. If a database already has the older migration history (`001_schema`, `002_seed`, `003_authentication`, or `004_email_verification`), reset that database before applying the new two-file set.
 - Never run dev migrations against Neon `main` or production migrations against Neon `dev` without reviewing them.
 - The production GitHub Action never runs database migrations. A designated maintainer must run production migrations separately after review, a restore point, and explicit approval.
-- The designated maintainer can run a production migration from a secure terminal with `npm run migrate:prod -- --database-url "$DATABASE_URL"`, then unset `DATABASE_URL`.
+- The designated maintainer can run a production migration from a secure terminal after loading `.env.prod`; production migrations must target Neon `main`, not the dev branch.
 - `.env.dev` and `.env.prod` are ignored and must never be committed.
 - `.env.dev.example` documents local Worker values.
-- `.env.prod.example` documents the migration-only `DATABASE_URL`.
-- `SESSION_SECRET` is a Cloudflare Worker secret, not a value in `wrangler.jsonc` or the frontend.
+- `.env.prod.example` documents the migration-only `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB`.
+- `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are server-only Worker secrets and must be configured separately for dev and production. Do not share or commit them.
 - `wrangler.jsonc` contains non-secret environment values, R2 bucket names, Hyperdrive IDs, and Worker settings.
+
+## Authentication prototype
+
+The public landing page provides login and signup for `@vt.edu` addresses. New accounts must verify their email before receiving a seven-day, HttpOnly session cookie backed by the `"Session"` table. Verification tokens are single-use and have no timestamp-based expiration. Seeded demo accounts use the shared demo password documented in `002_seed.sql`.
+
+The authentication API is:
+
+- `POST /api/auth/signup`
+- `POST /api/auth/verify-email`
+- `POST /api/auth/resend-verification`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+
+The Neon database health endpoint remains public. Other `/api/*` requests require a valid session.
+
+To reset the dev database, load `.env.dev` and confirm the prompt:
+
+```sh
+set -a
+source .env.dev
+set +a
+npm run db:reset -- --environment dev
+```
+
+To reset production, use `.env.prod` and type `RESET PROD` when prompted. Verify the Neon branch and database before confirming.
 
 ## Project structure
 
 ```text
 src/                         Svelte frontend
-src/App.svelte               Environment-aware R2/database integration page
+src/App.svelte               Authentication and profile landing page
 src/app.css                  Frontend styles
 worker/index.ts              Hono Worker API, health check, and asset fallback
-tests/                       Vitest application smoke tests
+worker/auth.ts               Password, session-token, and signup validation helpers
+worker/db.ts                 Testable PostgreSQL client lifecycle helper
+tests/                       Vitest application tests
 migrations/dev/              Development SQL migrations
 migrations/prod/             Production SQL migrations
 scripts/migrate.ts           Transactional migration runner
-scripts/fixtures/            R2 smoke-test files
 wrangler.jsonc               Cloudflare Worker, R2, Hyperdrive, and environment config
 package.json                 npm scripts and dependency ranges
 package-lock.json            Locked npm dependency versions
