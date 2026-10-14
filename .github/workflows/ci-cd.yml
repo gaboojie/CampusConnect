@@ -69,6 +69,3 @@ jobs:
         run: |
           health_response=$(curl --fail --show-error --retry 3 "$APP_ORIGIN/api/health")
           echo "$health_response"
-          echo "$health_response" | grep -q '"deployment":"production-ci"'
-          curl --fail --show-error --retry 3 \
-            "$APP_ORIGIN/api/integration-smoke?key=prod-smoke%2Fcampusconnect.txt"

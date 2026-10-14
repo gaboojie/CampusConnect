@@ -25,10 +25,7 @@ function getDatabaseUrl(environment: MigrationEnvironment): string {
   const databaseUrlIndex = process.argv.indexOf("--database-url");
   const databaseUrlFromArgs =
     databaseUrlIndex >= 0 ? process.argv[databaseUrlIndex + 1] : undefined;
-  const environmentVariable =
-    environment === "dev"
-      ? "CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB"
-      : "DATABASE_URL";
+  const environmentVariable = "CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB";
   const databaseUrl = databaseUrlFromArgs ?? process.env[environmentVariable];
 
   if (!databaseUrl || databaseUrl.startsWith("--")) {

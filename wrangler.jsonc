@@ -29,7 +29,6 @@
 			],
 			"secrets": {
 				"required": [
-					"SESSION_SECRET",
 					"RESEND_API_KEY",
 					"RESEND_FROM_EMAIL"
 				]
@@ -46,8 +45,7 @@
 			"workers_dev": true,
 			"vars": {
 				"APP_ENV": "production",
-				"PUBLIC_APP_ORIGIN": "https://campusconnect-production.vt-campusconnect.workers.dev",
-				"DEPLOYMENT_MARKER": "production-ci"
+				"PUBLIC_APP_ORIGIN": "https://campusconnect-production.vt-campusconnect.workers.dev"
 			},
 			"r2_buckets": [
 				{
@@ -63,7 +61,6 @@
 			},
 			"secrets": {
 				"required": [
-					"SESSION_SECRET",
 					"RESEND_API_KEY",
 					"RESEND_FROM_EMAIL"
 				]

@@ -45,10 +45,7 @@ function getEnvironment(): DatabaseEnvironment {
 
 function getDatabaseUrl(environment: DatabaseEnvironment): string {
   const databaseUrl = getArgument("--database-url");
-  const environmentVariable =
-    environment === "dev"
-      ? "CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB"
-      : "DATABASE_URL";
+  const environmentVariable = "CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB";
   const configuredUrl = databaseUrl ?? process.env[environmentVariable];
 
   if (!configuredUrl) {
