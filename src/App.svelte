@@ -1,18 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-
-  type PublicUser = {
-    userId: number
-    username: string
-    email: string
-    phoneNumber: string | null
-    role: string
-    createdAt: string
-    creditBalance: number
-    creditLastReset: string
-    emailNotificationsOn: boolean
-    textNotificationsOn: boolean
-  }
+  import AppLayout from './components/AppLayout.svelte'
+  import type { PublicUser } from './lib/types'
 
   type ApiError = {
     error?: string
@@ -74,6 +63,12 @@
 
   function clearVerificationHash() {
     if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
+    }
+  }
+
+  function clearAppRouteHash() {
+    if (typeof window !== 'undefined' && window.location.hash.startsWith('#/')) {
       window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
     }
   }
@@ -233,6 +228,7 @@
       }
 
       user = null
+      clearAppRouteHash()
       message = 'You have been signed out.'
     } catch {
       error = 'Unable to connect to CampusConnect.'
@@ -264,42 +260,23 @@
     </div>
   </header>
 
-  <main class="auth-shell">
-    <header class="hero">
-      <p class="eyebrow">Virginia Tech community</p>
-      <h1>Share space. Find your place.</h1>
-      <p class="lede">
-        Reserve useful campus resources with the Virginia Tech community.
-      </p>
-    </header>
+  <main class={user ? 'app-shell' : 'auth-shell'}>
+    {#if !user}
+      <header class="hero">
+        <p class="eyebrow">Virginia Tech community</p>
+        <h1>Share space. Find your place.</h1>
+        <p class="lede">
+          Reserve useful campus resources with the Virginia Tech community.
+        </p>
+      </header>
+    {/if}
 
     {#if loading}
       <section class="panel pending" aria-live="polite">
         <p>Checking your session…</p>
       </section>
     {:else if user}
-      <section class="panel profile-card">
-        <div class="profile-heading">
-          <div>
-            <p class="eyebrow">Your profile</p>
-            <h2>Welcome, {user.username}</h2>
-            <p class="muted">Your account is ready to use CampusConnect.</p>
-          </div>
-          <button type="button" class="secondary-button" on:click={logout} disabled={submitting}>
-            {submitting ? 'Signing out…' : 'Sign out'}
-          </button>
-        </div>
-
-        <dl class="profile-details">
-          <div><dt>Email</dt><dd>{user.email}</dd></div>
-          <div><dt>Phone</dt><dd>{user.phoneNumber ?? 'Not provided'}</dd></div>
-          <div><dt>Account type</dt><dd>{user.role}</dd></div>
-          <div><dt>Credits</dt><dd>{user.creditBalance}</dd></div>
-          <div><dt>Joined</dt><dd>{new Date(user.createdAt).toLocaleDateString()}</dd></div>
-          <div><dt>Email notifications</dt><dd>{user.emailNotificationsOn ? 'On' : 'Off'}</dd></div>
-          <div><dt>SMS notifications</dt><dd>{user.textNotificationsOn ? 'On' : 'Off'}</dd></div>
-        </dl>
-      </section>
+      <AppLayout {user} {submitting} onLogout={logout} />
     {:else if verificationToken}
       <section class="panel verification-card">
         <p class="eyebrow">One last step</p>
