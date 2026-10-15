@@ -29,6 +29,16 @@ import {
   searchResources,
 } from "./resources";
 import { getAnnouncements, parseAnnouncementQuery } from "./announcements";
+import {
+  cancelReservation,
+  createReservation,
+  listMyReservations,
+  parseCreateReservation,
+  parseReservationSlot,
+  rescheduleReservation,
+  type Reservation,
+  type ServiceResult,
+} from "./reservations";
 
 type Bindings = {
   ASSETS: Fetcher;
@@ -770,6 +780,88 @@ export function createApp(options: AppOptions = {}) {
     } catch {
       return c.json({ error: "Unable to load announcements right now." }, 503);
     }
+  });
+
+  const runReservationWrite = async (
+    c: Context<AppEnv>,
+    successStatus: 200 | 201,
+    work: (client: DatabaseClient) => Promise<ServiceResult<Reservation>>,
+  ) => {
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const result = await withDatabase(c.env.DB.connectionString, createDatabaseClient, work);
+
+      if (!result.ok) {
+        return c.json({ error: result.error }, result.status);
+      }
+      return c.json({ reservation: result.value }, successStatus);
+    } catch {
+      return c.json({ error: "Unable to save the reservation right now." }, 503);
+    }
+  };
+
+  app.post("/api/reservations", async (c) => {
+    const input = parseCreateReservation(await readJson(c));
+
+    if (!input.ok) {
+      return c.json({ error: input.error }, 400);
+    }
+
+    const userId = c.get("user").userId;
+    return runReservationWrite(c, 201, (client) =>
+      createReservation(client, userId, input.value),
+    );
+  });
+
+  app.get("/api/reservations/mine", async (c) => {
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const reservations = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => listMyReservations(client, c.get("user").userId),
+      );
+      return c.json(reservations);
+    } catch {
+      return c.json({ error: "Unable to load your reservations right now." }, 503);
+    }
+  });
+
+  app.patch("/api/reservations/:id", async (c) => {
+    const reservationId = parsePositiveId(c.req.param("id"));
+
+    if (reservationId === null) {
+      return c.json({ error: "Reservation id must be a positive whole number." }, 400);
+    }
+
+    const slot = parseReservationSlot(await readJson(c));
+    if (!slot.ok) {
+      return c.json({ error: slot.error }, 400);
+    }
+
+    const userId = c.get("user").userId;
+    return runReservationWrite(c, 200, (client) =>
+      rescheduleReservation(client, userId, reservationId, slot.value),
+    );
+  });
+
+  app.post("/api/reservations/:id/cancel", async (c) => {
+    const reservationId = parsePositiveId(c.req.param("id"));
+
+    if (reservationId === null) {
+      return c.json({ error: "Reservation id must be a positive whole number." }, 400);
+    }
+
+    const userId = c.get("user").userId;
+    return runReservationWrite(c, 200, (client) =>
+      cancelReservation(client, userId, reservationId),
+    );
   });
 
   app.all("*", async (c) => {

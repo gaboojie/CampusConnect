@@ -77,6 +77,31 @@ export type ResourceDetails = {
   }>
 }
 
+export type Reservation = {
+  id: number
+  resource: NamedOption
+  building: NamedOption
+  startTime: string
+  endTime: string
+  // 'confirmed' | 'completed' | 'cancelled' | 'no_show'
+  status: string
+  createdAt: string
+  // Confirmed and not started yet, so the time can be changed or it can be cancelled.
+  canModify: boolean
+}
+
+export type MyReservationsResponse = {
+  upcoming: Reservation[]
+  past: Reservation[]
+}
+
+// Same-day slot in campus time: "YYYY-MM-DD", "HH:MM", "HH:MM".
+export type SlotInput = {
+  date: string
+  start: string
+  end: string
+}
+
 export type AnnouncementType = 'maintenance' | 'new'
 
 export type Announcement = {

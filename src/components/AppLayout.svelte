@@ -4,6 +4,7 @@
   import AnnouncementsSection from './sections/AnnouncementsSection.svelte'
   import PlaceholderSection from './sections/PlaceholderSection.svelte'
   import ProfileSection from './sections/ProfileSection.svelte'
+  import ReservationsSection from './sections/ReservationsSection.svelte'
   import ResourceDetailSection from './sections/ResourceDetailSection.svelte'
   import ResourcesSection from './sections/ResourcesSection.svelte'
   import { DEFAULT_ROUTE, locationHash, parseLocation, routes, type AppLocation } from '../lib/routes'
@@ -100,6 +101,8 @@
       <ResourceDetailSection resourceId={location.subpath} backQuery={location.query} />
     {:else if route.id === 'resources'}
       <ResourcesSection query={location.query} />
+    {:else if route.id === 'reservations'}
+      <ReservationsSection />
     {:else if route.id === 'announcements'}
       <AnnouncementsSection />
     {:else}

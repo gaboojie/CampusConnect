@@ -1,10 +1,22 @@
-// Small GET helper for the authenticated JSON API. Throws an Error whose message
-// is safe to show to the user.
+// Small JSON helpers for the authenticated API. They throw an Error whose
+// message is safe to show to the user.
 export async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+  return requestJson<T>(url, { signal })
+}
+
+export async function sendJson<T>(method: 'POST' | 'PATCH', url: string, body?: unknown): Promise<T> {
+  return requestJson<T>(url, {
+    method,
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+}
+
+async function requestJson<T>(url: string, init: RequestInit): Promise<T> {
   let response: Response
 
   try {
-    response = await fetch(url, { signal })
+    response = await fetch(url, init)
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error
     throw new Error('Unable to connect to CampusConnect.')
