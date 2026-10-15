@@ -149,6 +149,36 @@ function parseId(raw: string | null, name: string): Validation<number | null> {
     : { ok: true, value };
 }
 
+export type Slot = { start: string; end: string };
+
+// Parses a same-day slot from "YYYY-MM-DD" + "HH:MM" + "HH:MM" into local campus
+// timestamps. All three blank means no slot.
+export function parseSlot(
+  rawDate: unknown,
+  rawStart: unknown,
+  rawEnd: unknown,
+): Validation<Slot | null> {
+  const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+  const date = text(rawDate);
+  const start = text(rawStart);
+  const end = text(rawEnd);
+
+  if (!date && !start && !end) return { ok: true, value: null };
+  if (!date || !start || !end) {
+    return { ok: false, error: "Choose a date, start time, and end time together." };
+  }
+  if (!isCalendarDate(date)) {
+    return { ok: false, error: "Date must be a valid YYYY-MM-DD date." };
+  }
+  if (!TIME_PATTERN.test(start) || !TIME_PATTERN.test(end)) {
+    return { ok: false, error: "Times must use the 24-hour HH:MM format." };
+  }
+  if (end <= start) {
+    return { ok: false, error: "End time must be after the start time." };
+  }
+  return { ok: true, value: { start: `${date} ${start}`, end: `${date} ${end}` } };
+}
+
 export function parseResourceSearch(params: URLSearchParams): Validation<ResourceSearch> {
   const q = (params.get("q") ?? "").trim();
   if (q.length > MAX_SEARCH_LENGTH) {
@@ -173,26 +203,8 @@ export function parseResourceSearch(params: URLSearchParams): Validation<Resourc
   const minCapacity = parseInteger(params.get("minCapacity"), "Minimum capacity", 1, MAX_CAPACITY);
   if (!minCapacity.ok) return minCapacity;
 
-  const date = (params.get("date") ?? "").trim();
-  const start = (params.get("start") ?? "").trim();
-  const end = (params.get("end") ?? "").trim();
-  let slot: ResourceSearch["slot"] = null;
-
-  if (date || start || end) {
-    if (!date || !start || !end) {
-      return { ok: false, error: "Choose a date, start time, and end time together." };
-    }
-    if (!isCalendarDate(date)) {
-      return { ok: false, error: "Date must be a valid YYYY-MM-DD date." };
-    }
-    if (!TIME_PATTERN.test(start) || !TIME_PATTERN.test(end)) {
-      return { ok: false, error: "Times must use the 24-hour HH:MM format." };
-    }
-    if (end <= start) {
-      return { ok: false, error: "End time must be after the start time." };
-    }
-    slot = { start: `${date} ${start}`, end: `${date} ${end}` };
-  }
+  const slot = parseSlot(params.get("date"), params.get("start"), params.get("end"));
+  if (!slot.ok) return slot;
 
   const sortRaw = (params.get("sort") ?? "").trim() || "name";
   if (!RESOURCE_SORTS.includes(sortRaw as ResourceSort)) {
@@ -220,7 +232,7 @@ export function parseResourceSearch(params: URLSearchParams): Validation<Resourc
       buildingId: buildingId.value,
       features,
       minCapacity: minCapacity.value,
-      slot,
+      slot: slot.value,
       sort: sortRaw as ResourceSort,
       limit,
       offset: offset.value ?? 0,
@@ -230,6 +242,73 @@ export function parseResourceSearch(params: URLSearchParams): Validation<Resourc
 
 function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, (character) => `\\${character}`);
+}
+
+// Slot predicates shared by resource search and reservations. Arguments are SQL
+// expressions (a column or a bound parameter), never user text.
+
+// The slot must fit inside one occurrence of an availability window. For a
+// repeating window, the candidate occurrence is the latest one starting at or
+// before the slot start: start_time + floor((slot_start - start_time) / offset) * offset.
+export function slotFitsAvailabilitySql(resourceId: string, start: string, end: string): string {
+  return `
+    EXISTS (
+      SELECT 1
+      FROM "ResourceAvailability" AS a
+      CROSS JOIN LATERAL (
+        SELECT CASE
+          WHEN a.repeats_offset IS NULL THEN a.start_time
+          ELSE a.start_time + FLOOR(
+            EXTRACT(EPOCH FROM (${start} - a.start_time))
+            / NULLIF(EXTRACT(EPOCH FROM a.repeats_offset), 0)
+          )::integer * a.repeats_offset
+        END AS occurrence_start
+      ) AS o
+      WHERE a.resource_id = ${resourceId}
+        AND o.occurrence_start >= a.start_time
+        AND o.occurrence_start <= ${start}
+        AND ${end} <= o.occurrence_start + (a.end_time - a.start_time)
+        AND (
+          a.repeats_offset IS NULL
+          OR a.repeats_until IS NULL
+          OR o.occurrence_start <= a.repeats_until
+        )
+    )
+  `;
+}
+
+// A non-cancelled reservation of the resource overlaps the slot. Pass
+// excludeReservationId to ignore the reservation being rescheduled.
+export function reservationOverlapSql(
+  resourceId: string,
+  start: string,
+  end: string,
+  excludeReservationId?: string,
+): string {
+  return `
+    EXISTS (
+      SELECT 1
+      FROM "Reservation" AS rv
+      WHERE rv.resource_id = ${resourceId}
+        AND rv.status <> 'cancelled'
+        AND rv.start_time < ${end}
+        AND rv.end_time > ${start}${
+          excludeReservationId ? `\n        AND rv.reservation_id <> ${excludeReservationId}` : ""
+        }
+    )
+  `;
+}
+
+export function maintenanceOverlapSql(resourceId: string, start: string, end: string): string {
+  return `
+    EXISTS (
+      SELECT 1
+      FROM "MaintenancePeriod" AS mp
+      WHERE mp.resource_id = ${resourceId}
+        AND mp.start_time < ${end}
+        AND mp.end_time > ${start}
+    )
+  `;
 }
 
 // Builds the shared FROM/WHERE clause. Every user value is bound as a parameter;
@@ -276,52 +355,9 @@ export function buildResourceSearchFilter(search: ResourceSearch): {
     const start = `${param(search.slot.start)}::timestamp`;
     const end = `${param(search.slot.end)}::timestamp`;
 
-    // The slot must fit inside one occurrence of an availability window. For a
-    // repeating window, the candidate occurrence is the latest one starting at or
-    // before the slot start: start_time + floor((slot_start - start_time) / offset) * offset.
-    conditions.push(`
-      EXISTS (
-        SELECT 1
-        FROM "ResourceAvailability" AS a
-        CROSS JOIN LATERAL (
-          SELECT CASE
-            WHEN a.repeats_offset IS NULL THEN a.start_time
-            ELSE a.start_time + FLOOR(
-              EXTRACT(EPOCH FROM (${start} - a.start_time))
-              / NULLIF(EXTRACT(EPOCH FROM a.repeats_offset), 0)
-            )::integer * a.repeats_offset
-          END AS occurrence_start
-        ) AS o
-        WHERE a.resource_id = r.resource_id
-          AND o.occurrence_start >= a.start_time
-          AND o.occurrence_start <= ${start}
-          AND ${end} <= o.occurrence_start + (a.end_time - a.start_time)
-          AND (
-            a.repeats_offset IS NULL
-            OR a.repeats_until IS NULL
-            OR o.occurrence_start <= a.repeats_until
-          )
-      )
-    `);
-    conditions.push(`
-      NOT EXISTS (
-        SELECT 1
-        FROM "Reservation" AS rv
-        WHERE rv.resource_id = r.resource_id
-          AND rv.status <> 'cancelled'
-          AND rv.start_time < ${end}
-          AND rv.end_time > ${start}
-      )
-    `);
-    conditions.push(`
-      NOT EXISTS (
-        SELECT 1
-        FROM "MaintenancePeriod" AS mp
-        WHERE mp.resource_id = r.resource_id
-          AND mp.start_time < ${end}
-          AND mp.end_time > ${start}
-      )
-    `);
+    conditions.push(slotFitsAvailabilitySql("r.resource_id", start, end));
+    conditions.push(`NOT ${reservationOverlapSql("r.resource_id", start, end)}`);
+    conditions.push(`NOT ${maintenanceOverlapSql("r.resource_id", start, end)}`);
   }
 
   return {

@@ -1235,12 +1235,153 @@ a.resource-card:hover {
   }
 }
 
+/* -------------------------------------------------------------------------
+   Reservations
+   ------------------------------------------------------------------------- */
+
+.reservations {
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+.reservation-form {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+
+.reservation-form-hint {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.reservation-form-error {
+  max-width: none;
+  margin: 0;
+}
+
+.reservation-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.danger-button {
+  color: #fff;
+  background: #a13232;
+}
+
+.danger-button:hover:not(:disabled) {
+  background: #842626;
+}
+
+.reservation-tabs {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #e2e5e9;
+}
+
+.reservation-tab {
+  margin-bottom: -1px;
+  border-bottom: 3px solid transparent;
+  border-radius: 8px 8px 0 0;
+  color: #69778a;
+  background: transparent;
+}
+
+.reservation-tab:hover:not(:disabled) {
+  color: #630031;
+  background: #f4e9ee;
+}
+
+.reservation-tab[aria-selected='true'] {
+  border-bottom-color: #630031;
+  color: #630031;
+}
+
+.reservation-message {
+  max-width: none;
+}
+
+.reservation-list {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reservation-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.reservation-card-body {
+  display: grid;
+  justify-items: start;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.reservation-card-body h3,
+.reservation-card-body p {
+  margin: 0;
+}
+
+.reservation-card-body h3 a {
+  color: inherit;
+  text-underline-offset: 0.16em;
+}
+
+.reservation-when {
+  font-weight: 650;
+}
+
+.reservation-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.status-confirmed {
+  color: #155b41;
+  background: #e4f5ed;
+}
+
+.status-active {
+  color: #7a4a00;
+  background: #fff1d6;
+}
+
+.status-cancelled {
+  color: #a13232;
+  background: #fbe9e9;
+}
+
+.status-completed {
+  color: #4a5565;
+  background: #eef0f3;
+}
+
 @media (max-width: 600px) {
   .results-toolbar,
   .detail-hero,
   .detail-columns {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .reservation-card-actions {
+    width: 100%;
+  }
+
+  .reservation-card-actions button {
+    flex: 1;
   }
 
   .sort-label {

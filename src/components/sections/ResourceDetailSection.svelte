@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onDestroy } from 'svelte'
-  import { getJson, isAbortError } from '../../lib/api'
+  import { getJson, isAbortError, sendJson } from '../../lib/api'
   import { formatClock, formatDate, formatDateTime, formatDuration, formatRating } from '../../lib/format'
-  import type { ResourceDetails } from '../../lib/types'
+  import { routeHash } from '../../lib/routes'
+  import type { ResourceDetails, SlotInput } from '../../lib/types'
+  import ReservationForm from '../reservations/ReservationForm.svelte'
 
   export let resourceId: string
   // The results page's filter query, kept so "Back to results" restores it.
@@ -12,6 +14,7 @@
   let loading = true
   let error = ''
   let controller: AbortController | undefined
+  let reserving = false
 
   $: backHref = `#/resources${backQuery ? `?${backQuery}` : ''}`
   $: image = resource?.images[0] ?? null
@@ -37,6 +40,23 @@
     } finally {
       if (controller === request) loading = false
     }
+  }
+
+  // Starts the form from the browse filters' date and time, when they were set.
+  function initialSlot(): SlotInput {
+    const params = new URLSearchParams(backQuery)
+    return {
+      date: params.get('date') ?? '',
+      start: params.get('start') ?? '',
+      end: params.get('end') ?? '',
+    }
+  }
+
+  async function reserve(slot: SlotInput) {
+    if (!resource) return
+    await sendJson('POST', '/api/reservations', { resourceId: resource.id, ...slot })
+    reserving = false
+    window.location.hash = routeHash('reservations')
   }
 
   onDestroy(() => controller?.abort())
@@ -80,8 +100,7 @@
           </p>
 
           <div class="reserve-box">
-            <button type="button" disabled aria-describedby="reserve-note">Reserve</button>
-            <p id="reserve-note" class="muted">Reservations coming soon</p>
+            <button type="button" on:click={() => (reserving = true)}>Reserve</button>
           </div>
         </div>
       </div>
@@ -170,5 +189,17 @@
         {/if}
       </section>
     </article>
+
+    {#if reserving}
+      <ReservationForm
+        title={resource.name}
+        subtitle="Reserve"
+        submitLabel="Reserve"
+        initial={initialSlot()}
+        maxMinutes={resource.maxReservationMinutes ?? 240}
+        onSubmit={reserve}
+        onClose={() => (reserving = false)}
+      />
+    {/if}
   {/if}
 </section>
