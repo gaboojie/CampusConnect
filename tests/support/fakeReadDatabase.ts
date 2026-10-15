@@ -24,6 +24,7 @@ const sessionUser: DatabaseUserRow = {
   credit_last_reset: new Date("2026-10-01T00:00:00Z"),
   email_notifications_on: true,
   text_notifications_on: false,
+  can_add_resources: false,
   is_banned: false,
 };
 

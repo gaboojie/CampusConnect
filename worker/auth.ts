@@ -18,6 +18,7 @@ export type PublicUser = {
   creditLastReset: string;
   emailNotificationsOn: boolean;
   textNotificationsOn: boolean;
+  canAddResources: boolean;
 };
 
 export type DatabaseUserRow = {
@@ -31,6 +32,7 @@ export type DatabaseUserRow = {
   credit_last_reset: string | Date;
   email_notifications_on: boolean;
   text_notifications_on: boolean;
+  can_add_resources: boolean;
   email_verified_at?: string | Date | null;
   password_hash?: string | null;
   is_banned?: boolean;
@@ -256,5 +258,6 @@ export function serializeUser(row: DatabaseUserRow): PublicUser {
     creditLastReset: new Date(row.credit_last_reset).toISOString().slice(0, 10),
     emailNotificationsOn: row.email_notifications_on,
     textNotificationsOn: row.text_notifications_on,
+    canAddResources: row.can_add_resources,
   };
 }

@@ -28,6 +28,15 @@ import {
   parseResourceSearch,
   searchResources,
 } from "./resources";
+import {
+  createListing,
+  deleteListing,
+  getImageMetadata,
+  getOwnedResource,
+  listOwnedResources,
+  parseListingInput,
+  updateListing,
+} from "./listings";
 import { getAnnouncements, parseAnnouncementQuery } from "./announcements";
 import {
   cancelReservation,
@@ -236,6 +245,7 @@ async function findAuthenticatedUser(
         u.credit_last_reset,
         u.email_notifications_on,
         u.text_notifications_on,
+        u.can_add_resources,
         u.is_banned
       FROM "Session" AS s
       JOIN "User" AS u ON u.user_id = s.user_id
@@ -383,7 +393,7 @@ export function createApp(options: AppOptions = {}) {
                   text_notifications_on,
                   email_verified_at
                 )
-                VALUES ($1, $2, $3, $4, 'student', 20, CURRENT_DATE, FALSE, FALSE, $5, $6, NULL)
+                VALUES ($1, $2, $3, $4, 'student', 20, CURRENT_DATE, FALSE, TRUE, $5, $6, NULL)
                 RETURNING
                   user_id,
                   username,
@@ -395,6 +405,7 @@ export function createApp(options: AppOptions = {}) {
                   credit_last_reset,
                   email_notifications_on,
                   text_notifications_on,
+                  can_add_resources,
                   email_verified_at
               `,
               [
@@ -624,6 +635,7 @@ export function createApp(options: AppOptions = {}) {
                 credit_last_reset,
                 email_notifications_on,
                 text_notifications_on,
+                can_add_resources,
                 email_verified_at,
                 password_hash,
                 is_banned
@@ -757,6 +769,132 @@ export function createApp(options: AppOptions = {}) {
       return c.json({ resource });
     } catch {
       return c.json({ error: "Unable to load this resource right now." }, 503);
+    }
+  });
+
+  app.get("/api/listings", async (c) => {
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const listings = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => listOwnedResources(client, c.get("user").userId),
+      );
+      return c.json({ listings });
+    } catch {
+      return c.json({ error: "Unable to load your listings right now." }, 503);
+    }
+  });
+
+  app.get("/api/listings/:id", async (c) => {
+    const resourceId = parsePositiveId(c.req.param("id"));
+    if (resourceId === null) return c.json({ error: "Listing id must be a positive whole number." }, 400);
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getOwnedResource(client, resourceId, c.get("user").userId),
+      );
+      if (!result.ok) return c.json({ error: result.error }, result.status);
+      return c.json({ listing: result.value });
+    } catch {
+      return c.json({ error: "Unable to load this listing right now." }, 503);
+    }
+  });
+
+  async function readListingForm(c: Context<AppEnv>): Promise<Record<string, unknown>> {
+    try {
+      const body = await c.req.parseBody({ all: true });
+      return body as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+
+  app.post("/api/listings", async (c) => {
+    const user = c.get("user");
+    if (!user.canAddResources) return c.json({ error: "Your account cannot add resources." }, 403);
+    const parsed = parseListingInput(await readListingForm(c));
+    if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => createListing(client, c.env.RESOURCE_IMAGES, user.userId, parsed.value),
+      );
+      if (!result.ok) return c.json({ error: result.error }, result.status);
+      return c.json({ listing: result.value }, 201);
+    } catch {
+      return c.json({ error: "Unable to create the listing right now." }, 503);
+    }
+  });
+
+  app.patch("/api/listings/:id", async (c) => {
+    const resourceId = parsePositiveId(c.req.param("id"));
+    if (resourceId === null) return c.json({ error: "Listing id must be a positive whole number." }, 400);
+    const parsed = parseListingInput(await readListingForm(c));
+    if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => updateListing(client, c.env.RESOURCE_IMAGES, c.get("user").userId, resourceId, parsed.value),
+      );
+      if (!result.ok) return c.json({ error: result.error }, result.status);
+      return c.json({ listing: result.value });
+    } catch {
+      return c.json({ error: "Unable to update the listing right now." }, 503);
+    }
+  });
+
+  app.delete("/api/listings/:id", async (c) => {
+    const resourceId = parsePositiveId(c.req.param("id"));
+    if (resourceId === null) return c.json({ error: "Listing id must be a positive whole number." }, 400);
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => deleteListing(client, c.env.RESOURCE_IMAGES, c.get("user").userId, resourceId),
+      );
+      if (!result.ok) return c.json({ error: result.error }, result.status);
+      return c.body(null, 204);
+    } catch {
+      return c.json({ error: "Unable to delete the listing right now." }, 503);
+    }
+  });
+
+  app.get("/api/resource-images/:id", async (c) => {
+    const imageId = parsePositiveId(c.req.param("id"));
+    if (imageId === null) return c.json({ error: "Image id must be a positive whole number." }, 400);
+    if (!c.env.DB || !c.env.RESOURCE_IMAGES) return c.notFound();
+
+    try {
+      const metadata = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getImageMetadata(client, imageId),
+      );
+      if (!metadata) return c.notFound();
+      const object = await c.env.RESOURCE_IMAGES.get(metadata.objectKey);
+      if (!object) return c.notFound();
+      return new Response(object.body, {
+        headers: {
+          "Content-Type": object.httpMetadata?.contentType ?? metadata.contentType,
+          "Content-Disposition": `inline; filename="${metadata.filename.replace(/[\"\\]/g, "_")}"`,
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
+    } catch {
+      return c.json({ error: "Unable to load this image right now." }, 503);
     }
   });
 

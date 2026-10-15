@@ -19,6 +19,29 @@ const UPCOMING_MAINTENANCE_LIMIT = 10;
 export const RESOURCE_SORTS = ["name", "rating", "capacity"] as const;
 export type ResourceSort = (typeof RESOURCE_SORTS)[number];
 
+export const AVAILABILITY_REPEATS = [
+  "none",
+  "daily",
+  "every_other_day",
+  "weekly",
+  "every_other_week",
+] as const;
+export type AvailabilityRepeat = (typeof AVAILABILITY_REPEATS)[number];
+export const AVAILABILITY_REPEAT_INTERVALS: Record<Exclude<AvailabilityRepeat, "none">, string> = {
+  daily: "1 day",
+  every_other_day: "2 days",
+  weekly: "7 days",
+  every_other_week: "14 days",
+};
+
+export type AvailabilitySlot = {
+  id: number;
+  startTime: string;
+  endTime: string;
+  repeat: AvailabilityRepeat;
+  repeatsUntil: string | null;
+};
+
 export type ResourceSearch = {
   q: string | null;
   categoryId: number | null;
@@ -65,9 +88,13 @@ export type ResourceDetails = {
   description: string;
   locationDescription: string;
   category: { id: number; name: string; description: string };
-  building: { id: number; name: string; address: string };
-  latitude: number;
-  longitude: number;
+  building: {
+    id: number;
+    name: string;
+    address: string;
+    latitude: number;
+    longitude: number;
+  };
   capacity: number;
   requiredCredits: number;
   maxReservationMinutes: number | null;
@@ -79,7 +106,7 @@ export type ResourceDetails = {
   weeklyHours: Array<{
     date: string;
     weekday: string;
-    windows: Array<{ opensAt: string; closesAt: string }>;
+    windows: Array<{ opensAt: string; closesAt: string; allDay: boolean }>;
   }>;
   upcomingMaintenance: Array<{
     id: number;
@@ -400,6 +427,7 @@ export function buildResourceSearchQueries(search: ResourceSearch): {
           c.category_name,
           b.building_id,
           b.building_name,
+          img.image_id,
           rating.average_rating,
           COALESCE(rating.review_count, 0) AS review_count
         FROM "Resource" AS r
@@ -413,6 +441,7 @@ export function buildResourceSearchQueries(search: ResourceSearch): {
           FROM "ResourceReview"
           GROUP BY resource_id
         ) AS rating ON rating.resource_id = r.resource_id
+        LEFT JOIN "ImageMetadata" AS img ON img.image_id = r.resource_image_id
         ${whereSql}
         ORDER BY ${ORDER_BY[search.sort]}
         LIMIT ${limitParam} OFFSET ${offsetParam}
@@ -433,6 +462,7 @@ type ResourceSummaryRow = {
   building_name: string;
   average_rating: number | string | null;
   review_count: number | string;
+  image_id: number | null;
 };
 
 function toNumberOrNull(value: number | string | null | undefined): number | null {
@@ -442,6 +472,10 @@ function toNumberOrNull(value: number | string | null | undefined): number | nul
 export function shortenDescription(description: string): string {
   if (description.length <= SHORT_DESCRIPTION_LENGTH) return description;
   return `${description.slice(0, SHORT_DESCRIPTION_LENGTH - 1).trimEnd()}…`;
+}
+
+export function resourceImageUrl(imageId: number): string {
+  return `/api/resource-images/${imageId}`;
 }
 
 export async function searchResources(
@@ -468,8 +502,7 @@ export async function searchResources(
       shortDescription: shortenDescription(row.description),
       averageRating: toNumberOrNull(row.average_rating),
       reviewCount: Number(row.review_count),
-      // No route serves R2 images yet; the UI shows a placeholder.
-      thumbnailUrl: null,
+      thumbnailUrl: row.image_id == null ? null : resourceImageUrl(row.image_id),
     })),
     total: Number(countResult.rows[0]?.total ?? 0),
     limit: search.limit,
@@ -512,8 +545,6 @@ type ResourceDetailRow = {
   name: string;
   description: string;
   location_description: string;
-  latitude: number | string;
-  longitude: number | string;
   capacity: number;
   required_credits: number;
   max_reservation_minutes: number | null;
@@ -524,6 +555,8 @@ type ResourceDetailRow = {
   building_id: number;
   building_name: string;
   address: string;
+  building_latitude: number | string;
+  building_longitude: number | string;
   owner_username: string;
   image_id: number | null;
   image_alt_text: string | null;
@@ -532,8 +565,8 @@ type ResourceDetailRow = {
 };
 
 // Weekly hours are not stored per weekday: ResourceAvailability holds a window that
-// repeats every repeats_offset until repeats_until. This expands each window's
-// occurrences that start during the next 7 campus days.
+// repeats every repeats_offset until repeats_until. This expands every occurrence
+// that intersects the next 7 campus days and clips it to each calendar day.
 export const WEEKLY_HOURS_SQL = `
   WITH week AS (
     SELECT
@@ -548,13 +581,16 @@ export const WEEKLY_HOURS_SQL = `
   occurrences AS (
     SELECT
       a.start_time + k * COALESCE(a.repeats_offset, interval '0') AS occurrence_start,
-      a.end_time - a.start_time AS duration
+      CASE
+        WHEN a.repeats_offset IS NULL THEN a.end_time
+        ELSE a.start_time + k * a.repeats_offset + (a.end_time - a.start_time)
+      END AS occurrence_end
     FROM "ResourceAvailability" AS a
     CROSS JOIN week AS w
     CROSS JOIN LATERAL generate_series(
       CASE
         WHEN a.repeats_offset IS NULL THEN 0
-        ELSE GREATEST(0, CEIL(
+        ELSE GREATEST(0, FLOOR(
           EXTRACT(EPOCH FROM (w.week_start - a.start_time))
           / NULLIF(EXTRACT(EPOCH FROM a.repeats_offset), 0)
         )::integer)
@@ -573,16 +609,23 @@ export const WEEKLY_HOURS_SQL = `
         OR a.repeats_until IS NULL
         OR a.start_time + k * a.repeats_offset <= a.repeats_until
       )
+      AND a.start_time + k * COALESCE(a.repeats_offset, interval '0') < w.week_end
+      AND CASE
+        WHEN a.repeats_offset IS NULL THEN a.end_time
+        ELSE a.start_time + k * a.repeats_offset + (a.end_time - a.start_time)
+      END > w.week_start
   )
   SELECT
     to_char(d.day_start, 'YYYY-MM-DD') AS day,
     to_char(d.day_start, 'FMDay') AS weekday,
-    to_char(o.occurrence_start, 'HH24:MI') AS opens_at,
-    to_char(o.occurrence_start + o.duration, 'HH24:MI') AS closes_at
+    to_char(GREATEST(o.occurrence_start, d.day_start), 'HH24:MI') AS opens_at,
+    to_char(LEAST(o.occurrence_end, d.day_start + interval '1 day'), 'HH24:MI') AS closes_at,
+    (GREATEST(o.occurrence_start, d.day_start) = d.day_start
+      AND LEAST(o.occurrence_end, d.day_start + interval '1 day') = d.day_start + interval '1 day') AS all_day
   FROM days AS d
   LEFT JOIN occurrences AS o
-    ON o.occurrence_start >= d.day_start
-    AND o.occurrence_start < d.day_start + interval '1 day'
+    ON o.occurrence_start < d.day_start + interval '1 day'
+    AND o.occurrence_end > d.day_start
   ORDER BY d.day_start, o.occurrence_start
 `;
 
@@ -597,8 +640,6 @@ export async function getResourceDetails(
         r.name,
         r.description,
         r.location_description,
-        r.latitude,
-        r.longitude,
         r.capacity,
         r.required_credits,
         (EXTRACT(EPOCH FROM r.max_reservation_time) / 60)::integer AS max_reservation_minutes,
@@ -609,6 +650,8 @@ export async function getResourceDetails(
         b.building_id,
         b.building_name,
         b.address,
+        b.latitude AS building_latitude,
+        b.longitude AS building_longitude,
         u.username AS owner_username,
         img.image_id,
         img.alt_text AS image_alt_text,
@@ -652,6 +695,7 @@ export async function getResourceDetails(
     weekday: string;
     opens_at: string | null;
     closes_at: string | null;
+    all_day: boolean | null;
   }>(WEEKLY_HOURS_SQL, [resourceId]);
   const maintenance = await client.query<{
     maintenance_id: number;
@@ -704,7 +748,7 @@ export async function getResourceDetails(
       weeklyHours.push(day);
     }
     if (row.opens_at && row.closes_at) {
-      day.windows.push({ opensAt: row.opens_at, closesAt: row.closes_at });
+      day.windows.push({ opensAt: row.opens_at, closesAt: row.closes_at, allDay: row.all_day === true });
     }
   }
 
@@ -722,9 +766,9 @@ export async function getResourceDetails(
       id: resource.building_id,
       name: resource.building_name,
       address: resource.address,
+      latitude: Number(resource.building_latitude),
+      longitude: Number(resource.building_longitude),
     },
-    latitude: Number(resource.latitude),
-    longitude: Number(resource.longitude),
     capacity: resource.capacity,
     requiredCredits: resource.required_credits,
     maxReservationMinutes: toNumberOrNull(resource.max_reservation_minutes),
@@ -743,10 +787,9 @@ export async function getResourceDetails(
       endTime: row.end_time,
       reason: row.reason,
     })),
-    // Image metadata exists, but no route serves R2 objects yet, so url stays null.
     images: resource.image_id === null
       ? []
-      : [{ id: resource.image_id, altText: resource.image_alt_text, url: null }],
+      : [{ id: resource.image_id, altText: resource.image_alt_text, url: resourceImageUrl(resource.image_id) }],
     recentReviews: reviews.rows.map((row) => ({
       id: row.review_id,
       rating: row.rating,

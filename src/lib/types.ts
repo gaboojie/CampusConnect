@@ -9,6 +9,7 @@ export type PublicUser = {
   creditLastReset: string
   emailNotificationsOn: boolean
   textNotificationsOn: boolean
+  canAddResources: boolean
 }
 
 // Timestamps from the resource and announcement APIs are campus wall-clock time
@@ -44,15 +45,23 @@ export type ResourceFilterOptions = {
   features: string[]
 }
 
+export type AvailabilityRepeat = 'none' | 'daily' | 'every_other_day' | 'weekly' | 'every_other_week'
+
+export type AvailabilitySlot = {
+  id: number
+  startTime: string
+  endTime: string
+  repeat: AvailabilityRepeat
+  repeatsUntil: string | null
+}
+
 export type ResourceDetails = {
   id: number
   name: string
   description: string
   locationDescription: string
   category: NamedOption & { description: string }
-  building: NamedOption & { address: string }
-  latitude: number
-  longitude: number
+  building: NamedOption & { address: string; latitude: number; longitude: number }
   capacity: number
   requiredCredits: number
   maxReservationMinutes: number | null
@@ -64,7 +73,7 @@ export type ResourceDetails = {
   weeklyHours: Array<{
     date: string
     weekday: string
-    windows: Array<{ opensAt: string; closesAt: string }>
+    windows: Array<{ opensAt: string; closesAt: string; allDay: boolean }>
   }>
   upcomingMaintenance: Array<{ id: number; startTime: string; endTime: string; reason: string }>
   images: Array<{ id: number; altText: string | null; url: string | null }>
@@ -75,6 +84,22 @@ export type ResourceDetails = {
     createdAt: string
     reviewerUsername: string | null
   }>
+}
+
+export type ListingSummary = ResourceSummary & {
+  hasActiveReservation: boolean
+  activeReservation: { startTime: string; endTime: string } | null
+}
+
+export type ListingDetails = ResourceDetails & {
+  hasActiveReservation: boolean
+  activeReservation: { startTime: string; endTime: string } | null
+  availability: AvailabilitySlot[]
+}
+
+export type ListingFormOptions = {
+  categories: NamedOption[]
+  buildings: NamedOption[]
 }
 
 export type Reservation = {

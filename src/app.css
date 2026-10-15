@@ -14,7 +14,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -200,6 +201,28 @@ input {
 }
 
 input:focus {
+  outline: 3px solid rgba(99, 0, 49, 0.15);
+  border-color: #630031;
+}
+
+textarea,
+select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #c7d2df;
+  border-radius: 10px;
+  padding: 0.75rem 0.8rem;
+  color: #172033;
+  background: #fbfdff;
+}
+
+textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+textarea:focus,
+select:focus {
   outline: 3px solid rgba(99, 0, 49, 0.15);
   border-color: #630031;
 }
@@ -674,6 +697,289 @@ code {
   }
 }
 
+.listing-form-modal {
+  width: min(920px, calc(100vw - 2rem));
+}
+
+.resource-form {
+  gap: 1.25rem;
+}
+
+.form-section {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid #e2e5e9;
+  border-radius: 14px;
+  padding: 1.15rem;
+  background: #fff;
+}
+
+.form-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #edf0f3;
+  padding-bottom: 0.85rem;
+}
+
+.form-section-heading h3 {
+  margin: 0;
+  color: #172033;
+  font-size: 1.05rem;
+}
+
+.form-section-heading .muted {
+  margin: 0.25rem 0 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.section-step {
+  display: grid;
+  width: 1.65rem;
+  height: 1.65rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  color: #630031;
+  background: #f4e9ee;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.form-field-wide {
+  grid-column: 1 / -1;
+}
+
+.resource-form textarea {
+  min-height: 5.5rem;
+}
+
+.form-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.two-up {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.duration-fields {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0;
+  border: 1px solid #e2e5e9;
+  border-radius: 12px;
+  padding: 1rem;
+  background: #fbfcfd;
+}
+
+.duration-fields legend {
+  padding: 0 0.35rem;
+  color: #344258;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.availability-fields {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  border: 1px solid #e2e5e9;
+  border-radius: 12px;
+  padding: 1rem;
+  background: #fbfcfd;
+}
+
+.availability-fields legend {
+  padding: 0 0.35rem;
+  color: #344258;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.form-help {
+  margin: -0.35rem 0 0;
+  font-size: 0.86rem;
+}
+
+.add-availability-button {
+  justify-self: start;
+}
+
+.availability-slot {
+  display: grid;
+  gap: 0.85rem;
+  border: 1px solid #e2e5e9;
+  border-radius: 10px;
+  padding: 0.85rem;
+}
+
+.availability-slot-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.compact-button {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+.availability-slot .compact-button:disabled {
+  cursor: not-allowed;
+}
+
+.field-error,
+.form-error {
+  margin: 0;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checkbox-label input {
+  width: auto;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  border-top: 1px solid #e4eaf0;
+  padding-top: 1.15rem;
+}
+
+.upload-progress {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  padding: 0.55rem 0.8rem;
+  color: #630031;
+  background: #f4e9ee;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.upload-progress-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgba(99, 0, 49, 0.14);
+  transition: width 120ms ease;
+}
+
+.upload-progress span {
+  position: relative;
+}
+
+.listings-page {
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+.listings-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.listings-heading > div {
+  min-width: 0;
+}
+
+.add-listing-button {
+  width: 3.25rem;
+  height: 3.25rem;
+  flex: 0 0 auto;
+  padding: 0;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.listing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.listing-card {
+  display: block;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 0;
+  overflow: hidden;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.listing-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 46px rgba(31, 20, 27, 0.13);
+}
+
+.listing-card-image {
+  display: grid;
+  width: 100%;
+  height: 150px;
+  place-items: center;
+  object-fit: cover;
+  background: #f4e9ee;
+}
+
+.listing-card-body {
+  padding: 1.1rem 1.2rem 1.25rem;
+}
+
+.listing-card-body h3 {
+  margin: 0.65rem 0 0.35rem;
+}
+
+.listing-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.active-listing-notice {
+  max-width: none;
+  color: #6c4a12;
+  background: #fff6da;
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+@media (max-width: 600px) {
+  .two-up {
+    grid-template-columns: 1fr;
+  }
+
+  .form-field-wide {
+    grid-column: auto;
+  }
+
+  .form-section {
+    padding: 1rem;
+  }
+}
+
 @media (max-width: 600px) {
   .site-header {
     min-height: 64px;
@@ -976,7 +1282,7 @@ a.resource-card:hover {
 }
 
 .resource-detail {
-  max-width: 920px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 
@@ -1001,13 +1307,17 @@ a.resource-card:hover {
 
 .detail-card {
   display: grid;
-  gap: 1.75rem;
+  gap: 1.25rem;
 }
 
 .detail-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
   gap: 1.5rem;
+  border: 1px solid #e2e5e9;
+  border-radius: 14px;
+  padding: 1.15rem;
+  background: #fbfcfd;
 }
 
 .detail-image {
@@ -1027,6 +1337,10 @@ a.resource-card:hover {
 .detail-summary h2,
 .detail-summary p {
   margin: 0;
+}
+
+.detail-summary h2 {
+  font-size: clamp(1.5rem, 3vw, 2rem);
 }
 
 .detail-address {
@@ -1055,18 +1369,79 @@ a.resource-card:hover {
   line-height: 1.6;
 }
 
+.detail-subsections {
+  display: grid;
+  gap: 1rem;
+}
+
+.detail-subsections > div + div {
+  border-top: 1px solid #edf0f3;
+  padding-top: 1rem;
+}
+
+.detail-subsections h4 {
+  margin: 0 0 0.35rem;
+  color: #69778a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.detail-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.detail-block {
+  min-width: 0;
+  border: 1px solid #e2e5e9;
+  border-radius: 14px;
+  padding: 1.15rem;
+  background: #fff;
+}
+
+.detail-block-wide {
+  grid-column: 1 / -1;
+}
+
 .detail-facts {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.detail-info-grid .detail-facts {
+  grid-template-columns: 1fr;
+}
+
+.detail-info-grid .detail-facts div {
+  display: grid;
+  grid-template-columns: minmax(10rem, 0.4fr) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.detail-info-grid .detail-facts dd {
+  margin-top: 0;
 }
 
 .detail-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.75rem;
+  gap: 1.25rem;
 }
 
 .detail-block h3 {
-  margin-bottom: 0.75rem;
+  margin: 0 0 0.85rem;
+  border-bottom: 1px solid #edf0f3;
+  padding-bottom: 0.7rem;
+  color: #172033;
+  font-size: 1.05rem;
+}
+
+.detail-secondary-grid .detail-block {
+  background: #fbfcfd;
 }
 
 .detail-block > .muted {
@@ -1374,6 +1749,24 @@ a.resource-card:hover {
   .detail-columns {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .detail-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-block-wide {
+    grid-column: auto;
+  }
+
+  .detail-hero,
+  .detail-block {
+    padding: 1rem;
+  }
+
+  .detail-info-grid .detail-facts div {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
   }
 
   .reservation-card-actions {

@@ -2,6 +2,8 @@
   import { onMount } from 'svelte'
   import Sidebar from './Sidebar.svelte'
   import AnnouncementsSection from './sections/AnnouncementsSection.svelte'
+  import ListingsSection from './sections/ListingsSection.svelte'
+  import ListingDetailSection from './sections/ListingDetailSection.svelte'
   import PlaceholderSection from './sections/PlaceholderSection.svelte'
   import ProfileSection from './sections/ProfileSection.svelte'
   import ReservationsSection from './sections/ReservationsSection.svelte'
@@ -101,6 +103,10 @@
       <ResourceDetailSection resourceId={location.subpath} backQuery={location.query} />
     {:else if route.id === 'resources'}
       <ResourcesSection query={location.query} />
+    {:else if route.id === 'listings' && location.subpath}
+      <ListingDetailSection listingId={location.subpath} {user} />
+    {:else if route.id === 'listings'}
+      <ListingsSection {user} />
     {:else if route.id === 'reservations'}
       <ReservationsSection />
     {:else if route.id === 'announcements'}

@@ -105,17 +105,43 @@
         </div>
       </div>
 
-      <p class="detail-description">{resource.description}</p>
+      <div class="detail-info-grid">
+        <section class="detail-block detail-block-wide">
+          <h3>Description</h3>
+          <div class="detail-subsections">
+            <div>
+              <h4>Resource description</h4>
+              <p class="detail-description">{resource.description}</p>
+            </div>
+            <div>
+              <h4>Location description</h4>
+              <p class="detail-description">{resource.locationDescription}</p>
+            </div>
+          </div>
+        </section>
 
-      <dl class="profile-details detail-facts">
-        <div><dt>Capacity</dt><dd>{resource.capacity} {resource.capacity === 1 ? 'person' : 'people'}</dd></div>
-        <div><dt>Credits per booking</dt><dd>{resource.requiredCredits}</dd></div>
-        <div>
-          <dt>Longest booking</dt>
-          <dd>{resource.maxReservationMinutes ? formatDuration(resource.maxReservationMinutes) : 'No limit'}</dd>
-        </div>
-        <div><dt>Listed by</dt><dd>{resource.ownerUsername}</dd></div>
-      </dl>
+        <section class="detail-block">
+          <h3>Location</h3>
+          <dl class="profile-details detail-facts">
+            <div><dt>Building</dt><dd>{resource.building.name}</dd></div>
+            <div><dt>Address</dt><dd>{resource.building.address}</dd></div>
+            <div><dt>Building coordinates</dt><dd>{resource.building.latitude}, {resource.building.longitude}</dd></div>
+          </dl>
+        </section>
+
+        <section class="detail-block">
+          <h3>Reservation facts</h3>
+          <dl class="profile-details detail-facts">
+            <div><dt>Capacity</dt><dd>{resource.capacity} {resource.capacity === 1 ? 'person' : 'people'}</dd></div>
+            <div><dt>Credits per booking</dt><dd>{resource.requiredCredits}</dd></div>
+            <div>
+              <dt>Longest booking</dt>
+              <dd>{resource.maxReservationMinutes ? formatDuration(resource.maxReservationMinutes) : 'No limit'}</dd>
+            </div>
+            <div><dt>Listed by</dt><dd>{resource.ownerUsername}</dd></div>
+          </dl>
+        </section>
+      </div>
 
       <div class="detail-columns">
         <section class="detail-block">
@@ -142,7 +168,7 @@
                     {#if day.windows.length === 0}
                       <span class="muted">Closed</span>
                     {:else}
-                      {day.windows.map((slot) => `${formatClock(slot.opensAt)} – ${formatClock(slot.closesAt)}`).join(', ')}
+                      {day.windows.map((slot) => slot.allDay ? 'Open all day' : `${formatClock(slot.opensAt)} – ${formatClock(slot.closesAt)}`).join(', ')}
                     {/if}
                   </td>
                 </tr>
@@ -152,42 +178,44 @@
         </section>
       </div>
 
-      <section class="detail-block">
-        <h3>Upcoming maintenance</h3>
-        {#if resource.upcomingMaintenance.length === 0}
-          <p class="muted">No maintenance scheduled.</p>
-        {:else}
-          <ul class="maintenance-list">
-            {#each resource.upcomingMaintenance as period (period.id)}
-              <li>
-                <strong>{formatDateTime(period.startTime)} – {formatDateTime(period.endTime)}</strong>
-                <span class="muted">{period.reason}</span>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </section>
+      <div class="detail-columns detail-secondary-grid">
+        <section class="detail-block">
+          <h3>Upcoming maintenance</h3>
+          {#if resource.upcomingMaintenance.length === 0}
+            <p class="muted">No maintenance scheduled.</p>
+          {:else}
+            <ul class="maintenance-list">
+              {#each resource.upcomingMaintenance as period (period.id)}
+                <li>
+                  <strong>{formatDateTime(period.startTime)} – {formatDateTime(period.endTime)}</strong>
+                  <span class="muted">{period.reason}</span>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </section>
 
-      <section class="detail-block">
-        <h3>Recent reviews</h3>
-        {#if resource.recentReviews.length === 0}
-          <p class="muted">No reviews yet.</p>
-        {:else}
-          <ul class="review-list">
-            {#each resource.recentReviews as review (review.id)}
-              <li class="review">
-                <p class="review-heading">
-                  <span class="star" aria-label={`${review.rating} out of 5 stars`}>
-                    {'★'.repeat(review.rating)}{'☆'.repeat(Math.max(0, 5 - review.rating))}
-                  </span>
-                  <span class="muted">{review.reviewerUsername ?? 'Anonymous'} · {formatDate(review.createdAt)}</span>
-                </p>
-                {#if review.reason}<p>{review.reason}</p>{/if}
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </section>
+        <section class="detail-block">
+          <h3>Recent reviews</h3>
+          {#if resource.recentReviews.length === 0}
+            <p class="muted">No reviews yet.</p>
+          {:else}
+            <ul class="review-list">
+              {#each resource.recentReviews as review (review.id)}
+                <li class="review">
+                  <p class="review-heading">
+                    <span class="star" aria-label={`${review.rating} out of 5 stars`}>
+                      {'★'.repeat(review.rating)}{'☆'.repeat(Math.max(0, 5 - review.rating))}
+                    </span>
+                    <span class="muted">{review.reviewerUsername ?? 'Anonymous'} · {formatDate(review.createdAt)}</span>
+                  </p>
+                  {#if review.reason}<p>{review.reason}</p>{/if}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </section>
+      </div>
     </article>
 
     {#if reserving}

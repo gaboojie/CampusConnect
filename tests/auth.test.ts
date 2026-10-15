@@ -93,6 +93,7 @@ class FakeClient implements DatabaseClient {
         credit_last_reset: createdAt,
         email_notifications_on: emailNotificationsOn,
         text_notifications_on: textNotificationsOn,
+        can_add_resources: true,
         email_verified_at: null,
         is_banned: false,
       } satisfies DatabaseUserRow & { password_hash: string | null };
