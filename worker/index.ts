@@ -21,6 +21,14 @@ import {
   type DatabaseClient,
   type DatabaseClientFactory,
 } from "./db";
+import {
+  getResourceDetails,
+  getResourceFilters,
+  parsePositiveId,
+  parseResourceSearch,
+  searchResources,
+} from "./resources";
+import { getAnnouncements, parseAnnouncementQuery } from "./announcements";
 
 type Bindings = {
   ASSETS: Fetcher;
@@ -675,6 +683,94 @@ export function createApp(options: AppOptions = {}) {
   });
 
   app.get("/api/auth/me", (c) => c.json({ user: c.get("user") }));
+
+  app.get("/api/resources", async (c) => {
+    const search = parseResourceSearch(new URL(c.req.url).searchParams);
+
+    if (!search.ok) {
+      return c.json({ error: search.error }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => searchResources(client, search.value),
+      );
+      return c.json(result);
+    } catch {
+      return c.json({ error: "Unable to load resources right now." }, 503);
+    }
+  });
+
+  app.get("/api/resources/filters", async (c) => {
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const filters = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getResourceFilters(client),
+      );
+      return c.json(filters);
+    } catch {
+      return c.json({ error: "Unable to load filters right now." }, 503);
+    }
+  });
+
+  app.get("/api/resources/:id", async (c) => {
+    const resourceId = parsePositiveId(c.req.param("id"));
+
+    if (resourceId === null) {
+      return c.json({ error: "Resource id must be a positive whole number." }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const resource = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getResourceDetails(client, resourceId),
+      );
+
+      if (!resource) {
+        return c.json({ error: "Resource not found." }, 404);
+      }
+
+      return c.json({ resource });
+    } catch {
+      return c.json({ error: "Unable to load this resource right now." }, 503);
+    }
+  });
+
+  app.get("/api/announcements", async (c) => {
+    const query = parseAnnouncementQuery(new URL(c.req.url).searchParams);
+
+    if (!query.ok) {
+      return c.json({ error: query.error }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const announcements = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getAnnouncements(client, query.value),
+      );
+      return c.json({ announcements });
+    } catch {
+      return c.json({ error: "Unable to load announcements right now." }, 503);
+    }
+  });
 
   app.all("*", async (c) => {
     const response = await c.env.ASSETS.fetch(c.req.raw);
