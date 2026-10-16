@@ -52,6 +52,16 @@ export type SignupValidation =
   | { ok: true; value: SignupInput }
   | { ok: false; fieldErrors: Record<string, string> };
 
+export type ChangePasswordInput = {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+};
+
+export type ChangePasswordValidation =
+  | { ok: true; value: ChangePasswordInput }
+  | { ok: false; fieldErrors: Record<string, string> };
+
 export type EmailVerificationTokenRow = {
   token_id: number;
   user_id: number;
@@ -244,6 +254,38 @@ export function validateSignupInput(body: unknown): SignupValidation {
       textNotificationsOn,
     },
   };
+}
+
+export function validateChangePasswordInput(body: unknown): ChangePasswordValidation {
+  if (!body || typeof body !== "object") {
+    return { ok: false, fieldErrors: { form: "Enter your current and new password." } };
+  }
+
+  const values = body as Record<string, unknown>;
+  const currentPassword =
+    typeof values.currentPassword === "string" ? values.currentPassword : "";
+  const newPassword = typeof values.newPassword === "string" ? values.newPassword : "";
+  const confirmPassword =
+    typeof values.confirmPassword === "string" ? values.confirmPassword : "";
+  const fieldErrors: Record<string, string> = {};
+
+  if (!currentPassword) {
+    fieldErrors.currentPassword = "Enter your current password.";
+  }
+  if (newPassword.length < 8 || newPassword.length > 128) {
+    fieldErrors.newPassword = "Use a password between 8 and 128 characters.";
+  } else if (newPassword === currentPassword) {
+    fieldErrors.newPassword = "Choose a password different from your current one.";
+  }
+  if (newPassword !== confirmPassword) {
+    fieldErrors.confirmPassword = "The passwords do not match.";
+  }
+
+  if (Object.keys(fieldErrors).length > 0) {
+    return { ok: false, fieldErrors };
+  }
+
+  return { ok: true, value: { currentPassword, newPassword, confirmPassword } };
 }
 
 export function serializeUser(row: DatabaseUserRow): PublicUser {

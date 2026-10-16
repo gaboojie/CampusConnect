@@ -1,7 +1,5 @@
 <script lang="ts">
-  import type { AppRoute } from '../../lib/routes'
-
-  export let route: AppRoute
+  export let route: { label: string; description: string }
 </script>
 
 <section class="panel placeholder-card">

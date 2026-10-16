@@ -12,6 +12,7 @@ import {
   SESSION_TTL_SECONDS,
   type DatabaseUserRow,
   type PublicUser,
+  validateChangePasswordInput,
   validateSignupInput,
   verifyPassword,
 } from "./auth";
@@ -38,6 +39,14 @@ import {
   updateListing,
 } from "./listings";
 import { getAnnouncements, parseAnnouncementQuery } from "./announcements";
+import {
+  getStats,
+  getUserDetail,
+  listReservations,
+  listUsers,
+  parseAdminReservationQuery,
+  parseAdminUserQuery,
+} from "./admin";
 import {
   cancelReservation,
   createReservation,
@@ -314,6 +323,14 @@ export function createApp(options: AppOptions = {}) {
     }
 
     return requireAuthentication(c, next, createDatabaseClient);
+  });
+
+  app.use("/api/admin/*", async (c, next) => {
+    if (c.get("user").role !== "admin") {
+      return c.json({ error: "Administrator access required." }, 403);
+    }
+
+    return next();
   });
 
   const getEmailSender = (c: Context<AppEnv>): VerificationEmailSender =>
@@ -704,6 +721,79 @@ export function createApp(options: AppOptions = {}) {
     return c.body(null, 204);
   });
 
+  app.post("/api/auth/change-password", async (c) => {
+    const validation = validateChangePasswordInput(await readJson(c));
+
+    if (!validation.ok) {
+      return c.json(
+        { error: "Please correct the highlighted fields.", fieldErrors: validation.fieldErrors },
+        400,
+      );
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    const userId = c.get("user").userId;
+    const currentTokenHash = await hashSessionToken(getCookie(c, SESSION_COOKIE_NAME) ?? "");
+
+    try {
+      const changed = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        async (client) => {
+          const userResult = await client.query<{ password_hash: string | null }>(
+            `SELECT password_hash FROM "User" WHERE user_id = $1`,
+            [userId],
+          );
+
+          if (
+            !(await verifyPassword(
+              validation.value.currentPassword,
+              userResult.rows[0]?.password_hash,
+            ))
+          ) {
+            return false;
+          }
+
+          const passwordHash = await hashPassword(validation.value.newPassword);
+
+          await client.query("BEGIN");
+          try {
+            await client.query(
+              `UPDATE "User" SET password_hash = $1 WHERE user_id = $2`,
+              [passwordHash, userId],
+            );
+            // Other devices are signed out; this session stays.
+            await client.query(
+              `DELETE FROM "Session" WHERE user_id = $1 AND token_hash <> $2::bytea`,
+              [userId, currentTokenHash],
+            );
+            await client.query("COMMIT");
+            return true;
+          } catch (error) {
+            await client.query("ROLLBACK");
+            throw error;
+          }
+        },
+      );
+
+      if (!changed) {
+        return c.json(
+          {
+            error: "Please correct the highlighted fields.",
+            fieldErrors: { currentPassword: "Your current password is incorrect." },
+          },
+          400,
+        );
+      }
+
+      return c.json({ message: "Your password has been updated." });
+    } catch {
+      return c.json({ error: "Unable to change your password right now." }, 503);
+    }
+  });
+
   app.get("/api/auth/me", (c) => c.json({ user: c.get("user") }));
 
   app.get("/api/resources", async (c) => {
@@ -1000,6 +1090,94 @@ export function createApp(options: AppOptions = {}) {
     return runReservationWrite(c, 200, (client) =>
       cancelReservation(client, userId, reservationId),
     );
+  });
+
+  app.get("/api/admin/stats", async (c) => {
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const stats = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getStats(client),
+      );
+      return c.json({ stats });
+    } catch {
+      return c.json({ error: "Unable to load statistics right now." }, 503);
+    }
+  });
+
+  app.get("/api/admin/users", async (c) => {
+    const query = parseAdminUserQuery(new URL(c.req.url).searchParams);
+
+    if (!query.ok) {
+      return c.json({ error: query.error }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const users = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => listUsers(client, query.value),
+      );
+      return c.json(users);
+    } catch {
+      return c.json({ error: "Unable to load users right now." }, 503);
+    }
+  });
+
+  app.get("/api/admin/users/:id", async (c) => {
+    const userId = parsePositiveId(c.req.param("id"));
+
+    if (userId === null) {
+      return c.json({ error: "User id must be a positive whole number." }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const user = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getUserDetail(client, userId),
+      );
+
+      if (!user) {
+        return c.json({ error: "User not found." }, 404);
+      }
+
+      return c.json({ user });
+    } catch {
+      return c.json({ error: "Unable to load this user right now." }, 503);
+    }
+  });
+
+  app.get("/api/admin/reservations", async (c) => {
+    const query = parseAdminReservationQuery(new URL(c.req.url).searchParams);
+
+    if (!query.ok) {
+      return c.json({ error: query.error }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const reservations = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => listReservations(client, query.value),
+      );
+      return c.json(reservations);
+    } catch {
+      return c.json({ error: "Unable to load reservations right now." }, 503);
+    }
   });
 
   app.all("*", async (c) => {

@@ -137,3 +137,48 @@ export type Announcement = {
   date: string
   resourceId: number
 }
+
+export type AdminUser = {
+  userId: number
+  username: string
+  email: string
+  phoneNumber: string | null
+  role: string
+  createdAt: string
+  emailVerifiedAt: string | null
+  creditBalance: number
+  isBanned: boolean
+  canAddResources: boolean
+  emailNotificationsOn: boolean
+  textNotificationsOn: boolean
+  status: 'active' | 'banned' | 'unverified'
+}
+
+export type AdminUserDetail = AdminUser & {
+  creditLastReset: string
+  resourcesOwned: number
+  reservationCounts: Record<string, number>
+}
+
+export type AdminPage<T> = {
+  items: T[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export type AdminReservation = {
+  id: number
+  status: string
+  startTime: string
+  endTime: string
+  createdAt: string
+  user: { id: number; username: string }
+  resource: { id: number; name: string }
+}
+
+export type AdminStats = {
+  users: { total: number; verified: number; unverified: number; banned: number; byRole: Record<string, number> }
+  resources: { total: number }
+  reservations: { total: number; byStatus: Record<string, number> }
+}
