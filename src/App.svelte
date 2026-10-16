@@ -411,6 +411,10 @@
           </label>
         </fieldset>
 
+        {#if error}
+          <p class="notice error-notice" role="alert">{error}</p>
+        {/if}
+
         <button type="submit" disabled={submitting}>
           {submitting ? 'Creating account…' : 'Create account'}
         </button>
