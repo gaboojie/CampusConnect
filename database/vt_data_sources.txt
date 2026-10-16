@@ -108,8 +108,9 @@ Everything else is SIMULATED:
     reservable spaces.
   - Capacities, required_credits, max_reservation_time, descriptions,
     and location_description text.
-  - Resource latitude/longitude: copied from the parent building's
-    official coordinates. Room-level positions are not verified.
+  - Resource location: inherited from the selected building. Building
+    latitude/longitude come from the building's official coordinates; room-level
+    positions are not verified.
   - Resource features (whiteboards, displays, projectors, nets, mats).
     The only exception is "Power station" in Newman rooms, which follows
     [S2].

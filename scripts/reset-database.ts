@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { Client } from "pg";
@@ -46,6 +47,14 @@ function getEnvironment(): DatabaseEnvironment {
 function getDatabaseUrl(environment: DatabaseEnvironment): string {
   const databaseUrl = getArgument("--database-url");
   const environmentVariable = "CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB";
+
+  // Development resets use the same local Hyperdrive connection string as the
+  // dev migration command. Loading the file here keeps `npm run db:reset --
+  // --environment dev` self-contained without exposing or duplicating the URL.
+  if (environment === "dev" && !databaseUrl && !process.env[environmentVariable] && existsSync(".env.dev")) {
+    process.loadEnvFile(".env.dev");
+  }
+
   const configuredUrl = databaseUrl ?? process.env[environmentVariable];
 
   if (!configuredUrl) {

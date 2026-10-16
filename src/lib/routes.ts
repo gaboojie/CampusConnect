@@ -65,7 +65,7 @@ export type AppLocation = {
 }
 
 // Routes that accept a numeric second segment.
-const ROUTES_WITH_ID: RouteId[] = ['resources']
+const ROUTES_WITH_ID: RouteId[] = ['resources', 'listings']
 
 // Only "#/<id>" hashes are routes, so other hashes such as "#verify=<token>" are left alone.
 export function parseLocation(hash: string): AppLocation {

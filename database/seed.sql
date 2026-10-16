@@ -149,32 +149,32 @@ INSERT INTO "ResourceCategory" (category_id, category_name, description) VALUES
 
 -- -----------------------------------------------------------------------------
 -- Resource (simulated reservable units inside real VT facilities)
--- Coordinates repeat the building's official coordinates; room-level
--- positions were not verified. Credits and capacities are fictional.
+-- Resource locations use the selected building; room-level positions were not
+-- verified. Credits and capacities are fictional.
 -- -----------------------------------------------------------------------------
-INSERT INTO "Resource" (resource_id, owner_id, building_id, category_id, name, description, location_description, latitude, longitude, max_reservation_time, required_credits, capacity, created_at, resource_image_id) VALUES
-    (1, 2, 1, 1, 'Newman Group Study Room 1', 'Small group study room with a whiteboard and table seating for four.', 'Fourth floor, group study room area', '37.228760', '-80.419240', '2 hours', 2, 4, '2026-08-13 10:00:00', NULL),
-    (2, 2, 1, 1, 'Newman Group Study Room 2', 'Small group study room with a whiteboard and table seating for four.', 'Fourth floor, group study room area', '37.228760', '-80.419240', '2 hours', 2, 4, '2026-08-13 10:00:00', NULL),
-    (3, 2, 1, 1, 'Newman Group Study Room 3', 'Mid-size group study room with a whiteboard and wall-mounted display.', 'Fourth floor, group study room area', '37.228760', '-80.419240', '2 hours', 2, 6, '2026-08-13 10:00:00', NULL),
-    (4, 2, 1, 1, 'Newman Group Study Room 4', 'Mid-size group study room with a whiteboard and wall-mounted display.', 'Fourth floor, group study room area', '37.228760', '-80.419240', '2 hours', 2, 6, '2026-08-13 10:00:00', 1),
-    (5, 2, 1, 1, 'Newman Group Study Room 5', 'Large group study room suited to project teams, with a display and two whiteboards.', 'Fourth floor, group study room area', '37.228760', '-80.419240', '2 hours', 2, 8, '2026-08-13 10:00:00', NULL),
-    (6, 2, 1, 1, 'Newman Group Study Room 6', 'Large group study room suited to project teams, with a display and two whiteboards.', 'Fourth floor, group study room area', '37.228760', '-80.419240', '2 hours', 2, 8, '2026-08-13 10:00:00', NULL),
-    (7, 1, 2, 2, 'Torgersen Project Room 1', 'Project room for team meetings and presentation practice.', 'Torgersen Hall (simulated room; no official room number assigned)', '37.229780', '-80.419970', '3 hours', 2, 8, '2026-08-13 09:00:00', NULL),
-    (8, 1, 2, 2, 'Torgersen Project Room 2', 'Project room for team meetings and presentation practice.', 'Torgersen Hall (simulated room; no official room number assigned)', '37.229780', '-80.419970', '3 hours', 2, 8, '2026-08-13 09:00:00', NULL),
-    (9, 1, 2, 1, 'Torgersen Atrium Study Table', 'Reservable table in the first-floor atrium study court with laptop power.', 'First-floor atrium (electronic study court)', '37.229780', '-80.419970', '2 hours', 1, 4, '2026-08-13 09:00:00', NULL),
-    (10, 3, 3, 3, 'McComas Basketball/Volleyball Court 1', 'Full hardwood court for pickup basketball or volleyball.', 'Gymnasium level, Court 1 of 3', '37.220690', '-80.422300', '2 hours', 4, 12, '2026-08-14 09:00:00', 2),
-    (11, 3, 3, 3, 'McComas Basketball/Volleyball Court 2', 'Full hardwood court for pickup basketball or volleyball.', 'Gymnasium level, Court 2 of 3', '37.220690', '-80.422300', '2 hours', 4, 12, '2026-08-14 09:00:00', NULL),
-    (12, 3, 3, 5, 'McComas Pool Lap Lane 1', 'One lap lane in the 25-yard, 8-lane pool.', 'McComas pool, Lane 1', '37.220690', '-80.422300', '1 hours', 1, 2, '2026-08-14 09:00:00', 3),
-    (13, 3, 3, 6, 'McComas Multipurpose Studio', 'Open multipurpose fitness studio with mats and mirrors.', 'Multipurpose fitness studio', '37.220690', '-80.422300', '1 hours 30 minutes', 3, 25, '2026-08-14 09:00:00', NULL),
-    (14, 4, 4, 4, 'War Memorial Racquetball Court 1', 'Enclosed racquetball court.', 'Racquetball court area, Court 1 of 5', '37.226290', '-80.420590', '1 hours', 2, 4, '2026-08-14 10:00:00', 4),
-    (15, 4, 4, 4, 'War Memorial Racquetball Court 2', 'Enclosed racquetball court.', 'Racquetball court area, Court 2 of 5', '37.226290', '-80.420590', '1 hours', 2, 4, '2026-08-14 10:00:00', NULL),
-    (16, 4, 4, 4, 'War Memorial Squash Court', 'War Memorial Hall''s single squash court.', 'Squash court', '37.226290', '-80.420590', '1 hours', 2, 4, '2026-08-14 10:00:00', NULL),
-    (17, 4, 4, 3, 'War Memorial Badminton/Pickleball Court A', 'One badminton/pickleball layout on the converted basketball courts.', 'Main gym, badminton/pickleball layout A', '37.226290', '-80.420590', '1 hours 30 minutes', 2, 4, '2026-08-14 10:00:00', NULL),
-    (18, 4, 4, 7, 'War Memorial Table Tennis Table 1', 'Table tennis table with paddles available at the service desk.', 'Table tennis space', '37.226290', '-80.420590', '1 hours', 1, 4, '2026-08-14 10:00:00', NULL),
-    (19, 4, 4, 7, 'War Memorial Table Tennis Table 2', 'Table tennis table with paddles available at the service desk.', 'Table tennis space', '37.226290', '-80.420590', '1 hours', 1, 4, '2026-08-14 10:00:00', NULL),
-    (20, 4, 4, 6, 'War Memorial Yoga Studio', 'Yoga studio for small-group practice sessions.', 'Yoga studio', '37.226290', '-80.420590', '1 hours 30 minutes', 3, 20, '2026-08-14 10:00:00', 5),
-    (21, 5, 5, 2, 'Squires Meeting Room A', 'Meeting room for student organization meetings, with a projector and conference seating.', 'Squires Student Center (simulated room; no official room number assigned)', '37.229620', '-80.417960', '3 hours', 3, 12, '2026-08-14 14:00:00', 6),
-    (22, 5, 5, 2, 'Squires Meeting Room B', 'Larger meeting room for organization general body meetings, with a projector.', 'Squires Student Center (simulated room; no official room number assigned)', '37.229620', '-80.417960', '3 hours', 3, 20, '2026-08-14 14:00:00', NULL);
+INSERT INTO "Resource" (resource_id, owner_id, building_id, category_id, name, description, location_description, max_reservation_time, required_credits, capacity, created_at, resource_image_id) VALUES
+    (1, 2, 1, 1, 'Newman Group Study Room 1', 'Small group study room with a whiteboard and table seating for four.', 'Fourth floor, group study room area', '2 hours', 2, 4, '2026-08-13 10:00:00', NULL),
+    (2, 2, 1, 1, 'Newman Group Study Room 2', 'Small group study room with a whiteboard and table seating for four.', 'Fourth floor, group study room area', '2 hours', 2, 4, '2026-08-13 10:00:00', NULL),
+    (3, 2, 1, 1, 'Newman Group Study Room 3', 'Mid-size group study room with a whiteboard and wall-mounted display.', 'Fourth floor, group study room area', '2 hours', 2, 6, '2026-08-13 10:00:00', NULL),
+    (4, 2, 1, 1, 'Newman Group Study Room 4', 'Mid-size group study room with a whiteboard and wall-mounted display.', 'Fourth floor, group study room area', '2 hours', 2, 6, '2026-08-13 10:00:00', 1),
+    (5, 2, 1, 1, 'Newman Group Study Room 5', 'Large group study room suited to project teams, with a display and two whiteboards.', 'Fourth floor, group study room area', '2 hours', 2, 8, '2026-08-13 10:00:00', NULL),
+    (6, 2, 1, 1, 'Newman Group Study Room 6', 'Large group study room suited to project teams, with a display and two whiteboards.', 'Fourth floor, group study room area', '2 hours', 2, 8, '2026-08-13 10:00:00', NULL),
+    (7, 1, 2, 2, 'Torgersen Project Room 1', 'Project room for team meetings and presentation practice.', 'Torgersen Hall (simulated room; no official room number assigned)', '3 hours', 2, 8, '2026-08-13 09:00:00', NULL),
+    (8, 1, 2, 2, 'Torgersen Project Room 2', 'Project room for team meetings and presentation practice.', 'Torgersen Hall (simulated room; no official room number assigned)', '3 hours', 2, 8, '2026-08-13 09:00:00', NULL),
+    (9, 1, 2, 1, 'Torgersen Atrium Study Table', 'Reservable table in the first-floor atrium study court with laptop power.', 'First-floor atrium (electronic study court)', '2 hours', 1, 4, '2026-08-13 09:00:00', NULL),
+    (10, 3, 3, 3, 'McComas Basketball/Volleyball Court 1', 'Full hardwood court for pickup basketball or volleyball.', 'Gymnasium level, Court 1 of 3', '2 hours', 4, 12, '2026-08-14 09:00:00', 2),
+    (11, 3, 3, 3, 'McComas Basketball/Volleyball Court 2', 'Full hardwood court for pickup basketball or volleyball.', 'Gymnasium level, Court 2 of 3', '2 hours', 4, 12, '2026-08-14 09:00:00', NULL),
+    (12, 3, 3, 5, 'McComas Pool Lap Lane 1', 'One lap lane in the 25-yard, 8-lane pool.', 'McComas pool, Lane 1', '1 hours', 1, 2, '2026-08-14 09:00:00', 3),
+    (13, 3, 3, 6, 'McComas Multipurpose Studio', 'Open multipurpose fitness studio with mats and mirrors.', 'Multipurpose fitness studio', '1 hours 30 minutes', 3, 25, '2026-08-14 09:00:00', NULL),
+    (14, 4, 4, 4, 'War Memorial Racquetball Court 1', 'Enclosed racquetball court.', 'Racquetball court area, Court 1 of 5', '1 hours', 2, 4, '2026-08-14 10:00:00', 4),
+    (15, 4, 4, 4, 'War Memorial Racquetball Court 2', 'Enclosed racquetball court.', 'Racquetball court area, Court 2 of 5', '1 hours', 2, 4, '2026-08-14 10:00:00', NULL),
+    (16, 4, 4, 4, 'War Memorial Squash Court', 'War Memorial Hall''s single squash court.', 'Squash court', '1 hours', 2, 4, '2026-08-14 10:00:00', NULL),
+    (17, 4, 4, 3, 'War Memorial Badminton/Pickleball Court A', 'One badminton/pickleball layout on the converted basketball courts.', 'Main gym, badminton/pickleball layout A', '1 hours 30 minutes', 2, 4, '2026-08-14 10:00:00', NULL),
+    (18, 4, 4, 7, 'War Memorial Table Tennis Table 1', 'Table tennis table with paddles available at the service desk.', 'Table tennis space', '1 hours', 1, 4, '2026-08-14 10:00:00', NULL),
+    (19, 4, 4, 7, 'War Memorial Table Tennis Table 2', 'Table tennis table with paddles available at the service desk.', 'Table tennis space', '1 hours', 1, 4, '2026-08-14 10:00:00', NULL),
+    (20, 4, 4, 6, 'War Memorial Yoga Studio', 'Yoga studio for small-group practice sessions.', 'Yoga studio', '1 hours 30 minutes', 3, 20, '2026-08-14 10:00:00', 5),
+    (21, 5, 5, 2, 'Squires Meeting Room A', 'Meeting room for student organization meetings, with a projector and conference seating.', 'Squires Student Center (simulated room; no official room number assigned)', '3 hours', 3, 12, '2026-08-14 14:00:00', 6),
+    (22, 5, 5, 2, 'Squires Meeting Room B', 'Larger meeting room for organization general body meetings, with a projector.', 'Squires Student Center (simulated room; no official room number assigned)', '3 hours', 3, 20, '2026-08-14 14:00:00', NULL);
 
 -- -----------------------------------------------------------------------------
 -- ResourceFeature

@@ -102,14 +102,11 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
 
 - `migrations/dev/` contains SQL for Neon `dev` and is applied manually by the owner when the shared dev schema changes.
 - `migrations/prod/` contains production-safe SQL for Neon `main` and runs separately with `npm run migrate:prod`.
-- Each environment currently has two files: `001_init.sql` creates the complete schema, and `002_seed.sql` inserts the synthetic grading/demo data.
+- Each environment has two files: `001_init.sql` creates the complete schema, and `002_seed.sql` inserts the synthetic grading/demo data.
 - `scripts/migrate.ts` applies files in order and records applied versions in `schema_migrations`.
-- Before running dev migrations, load `.env.dev`; `npm run migrate:dev` uses `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` for the connection. For example:
+- `npm run migrate:dev` automatically uses `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` from `.env.dev` for the connection. For example:
 
   ```sh
-  set -a
-  source .env.dev
-  set +a
   npm run migrate:dev
   ```
 
@@ -149,12 +146,9 @@ The authentication API is:
 
 The Neon database health endpoint remains public. Other `/api/*` requests require a valid session.
 
-To reset the dev database, load `.env.dev` and confirm the prompt:
+To reset the dev database, the command automatically uses `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` from `.env.dev`; confirm the prompt when asked:
 
 ```sh
-set -a
-source .env.dev
-set +a
 npm run db:reset -- --environment dev
 ```
 

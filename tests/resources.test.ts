@@ -26,8 +26,6 @@ const detailRow = {
   name: "Squires Meeting Room B",
   description: "Larger meeting room for organization general body meetings, with a projector.",
   location_description: "Squires Student Center",
-  latitude: "37.229620",
-  longitude: "-80.417960",
   capacity: 20,
   required_credits: 3,
   max_reservation_minutes: 180,
@@ -38,6 +36,8 @@ const detailRow = {
   building_id: 5,
   building_name: "Squires Student Center",
   address: "290 College Ave., Blacksburg, VA 24061",
+  building_latitude: "37.229620",
+  building_longitude: "-80.417960",
   owner_username: "squires_events_mp",
   image_id: 6,
   image_alt_text: null,
@@ -308,8 +308,10 @@ describe("GET /api/resources/:id", () => {
     expect(resource).toMatchObject({
       id: 22,
       name: "Squires Meeting Room B",
-      latitude: 37.22962,
-      longitude: -80.41796,
+      building: {
+        latitude: 37.22962,
+        longitude: -80.41796,
+      },
       maxReservationMinutes: 180,
       averageRating: null,
       reviewCount: 0,
@@ -321,7 +323,7 @@ describe("GET /api/resources/:id", () => {
       upcomingMaintenance: [
         { id: 6, startTime: "2026-10-20T09:00:00", endTime: "2026-10-20T21:00:00", reason: "Projector replacement." },
       ],
-      images: [{ id: 6, altText: null, url: null }],
+      images: [{ id: 6, altText: null, url: "/api/resource-images/6" }],
       recentReviews: [
         { id: 8, rating: 4, reason: "Warm inside.", createdAt: "2026-09-25T10:00:00", reviewerUsername: null },
       ],
