@@ -34,6 +34,7 @@ export class FakeReadDatabase {
   queries: RecordedQuery[] = [];
   private responders: Responder[] = [];
   failWith: Error | null = null;
+  sessionRole = sessionUser.role;
 
   respond(match: string | ((query: string) => boolean), rows: unknown[] | ((values: readonly unknown[]) => unknown[])) {
     this.responders.push({
@@ -53,9 +54,9 @@ export class FakeReadDatabase {
       ): Promise<DatabaseQueryResult<T>> => {
         const query = text.replace(/\s+/g, " ").trim();
 
-        if (query.startsWith("SELECT u.user_id")) {
+        if (query.startsWith("SELECT u.user_id") && query.includes('FROM "Session"')) {
           const valid = values[0] === (await hashSessionToken(SESSION_TOKEN));
-          return { rows: valid ? [sessionUser as T] : [], rowCount: valid ? 1 : 0 };
+          return { rows: valid ? [{ ...sessionUser, role: this.sessionRole } as T] : [], rowCount: valid ? 1 : 0 };
         }
 
         this.queries.push({ text: query, values });

@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import AppLayout from './components/AppLayout.svelte'
+  import AdminLayout from './components/AdminLayout.svelte'
+  import ProfileMenu from './components/ProfileMenu.svelte'
+  import { isAdminPath } from './lib/adminRoutes'
   import type { PublicUser } from './lib/types'
 
   type ApiError = {
@@ -10,6 +13,7 @@
   }
 
   let user: PublicUser | null = null
+  let onAdminPath = typeof window !== 'undefined' && isAdminPath(window.location.pathname)
   let loading = true
   let submitting = false
   let signupOpen = false
@@ -68,8 +72,10 @@
   }
 
   function clearAppRouteHash() {
-    if (typeof window !== 'undefined' && window.location.hash.startsWith('#/')) {
-      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
+    if (typeof window !== 'undefined' && (window.location.hash.startsWith('#/') || onAdminPath)) {
+      const path = onAdminPath ? '/' : window.location.pathname
+      onAdminPath = false
+      window.history.replaceState(null, '', `${path}${window.location.search}`)
     }
   }
 
@@ -251,13 +257,17 @@
 <div class="site-shell">
   <header class="site-header">
     <a class="brand" href="/" aria-label="CampusConnect home">Campus Connect</a>
-    <div class="account-indicator" aria-label={user ? `Signed in as ${user.username}` : 'Not signed in'}>
-      <svg class="user-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="8" r="3.25" fill="none" stroke="currentColor" stroke-width="1.8" />
-        <path d="M5.5 20c.7-3.7 2.9-5.5 6.5-5.5s5.8 1.8 6.5 5.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
-      </svg>
-      <span>{user ? user.username : 'Not signed in'}</span>
-    </div>
+    {#if user}
+      <ProfileMenu {user} {submitting} onLogout={logout} />
+    {:else}
+      <div class="account-indicator" aria-label="Not signed in">
+        <svg class="user-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="8" r="3.25" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <path d="M5.5 20c.7-3.7 2.9-5.5 6.5-5.5s5.8 1.8 6.5 5.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+        </svg>
+        <span>Not signed in</span>
+      </div>
+    {/if}
   </header>
 
   <main class={user ? 'app-shell' : 'auth-shell'}>
@@ -276,7 +286,11 @@
         <p>Checking your session…</p>
       </section>
     {:else if user}
-      <AppLayout {user} {submitting} onLogout={logout} />
+      {#if onAdminPath}
+        <AdminLayout {user} />
+      {:else}
+        <AppLayout {user} {submitting} onLogout={logout} />
+      {/if}
     {:else if verificationToken}
       <section class="panel verification-card">
         <p class="eyebrow">One last step</p>

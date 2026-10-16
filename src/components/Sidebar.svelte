@@ -1,8 +1,11 @@
 <script lang="ts">
-  import { routeHash, type AppRoute, type RouteId } from '../lib/routes'
+  import { routeHash, type RouteId } from '../lib/routes'
 
-  export let routes: AppRoute[]
-  export let currentId: RouteId
+  type NavItem = { id: string; label: string; icon: string[] }
+
+  export let routes: NavItem[]
+  export let currentId: string
+  export let hrefFor: (id: string) => string = (id) => routeHash(id as RouteId)
   export let collapsed: boolean
   export let onToggle: () => void
   export let onNavigate: () => void
@@ -29,7 +32,7 @@
         <a
           class="sidebar-link"
           class:active={route.id === currentId}
-          href={routeHash(route.id)}
+          href={hrefFor(route.id)}
           aria-current={route.id === currentId ? 'page' : undefined}
           title={collapsed ? route.label : undefined}
           on:click={onNavigate}
