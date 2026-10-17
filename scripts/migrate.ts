@@ -28,10 +28,11 @@ function getDatabaseUrl(environment: MigrationEnvironment): string {
     databaseUrlIndex >= 0 ? process.argv[databaseUrlIndex + 1] : undefined;
   const environmentVariable = "CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB";
 
-  // Development migrations use the local Hyperdrive connection string from
-  // .env.dev when it has not already been exported or passed explicitly.
-  if (environment === "dev" && !databaseUrlFromArgs && !process.env[environmentVariable] && existsSync(".env.dev")) {
-    process.loadEnvFile(".env.dev");
+  // Load the selected environment's local Hyperdrive connection string when
+  // it has not already been exported or passed explicitly.
+  const environmentFile = join(projectRoot, `.env.${environment}`);
+  if (!databaseUrlFromArgs && !process.env[environmentVariable] && existsSync(environmentFile)) {
+    process.loadEnvFile(environmentFile);
   }
 
   const databaseUrl = databaseUrlFromArgs ?? process.env[environmentVariable];

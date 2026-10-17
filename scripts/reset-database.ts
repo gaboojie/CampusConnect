@@ -1,9 +1,13 @@
 import { existsSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
+import { dirname, join, resolve } from "node:path";
 import { stdin as input, stdout as output } from "node:process";
+import { fileURLToPath } from "node:url";
 import { Client } from "pg";
 
 type DatabaseEnvironment = "dev" | "prod";
+
+const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const resetPublicTablesSql = `
 DO $$
@@ -48,11 +52,11 @@ function getDatabaseUrl(environment: DatabaseEnvironment): string {
   const databaseUrl = getArgument("--database-url");
   const environmentVariable = "CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB";
 
-  // Development resets use the same local Hyperdrive connection string as the
-  // dev migration command. Loading the file here keeps `npm run db:reset --
-  // --environment dev` self-contained without exposing or duplicating the URL.
-  if (environment === "dev" && !databaseUrl && !process.env[environmentVariable] && existsSync(".env.dev")) {
-    process.loadEnvFile(".env.dev");
+  // Load the selected environment's local Hyperdrive connection string when
+  // it has not already been exported or passed explicitly.
+  const environmentFile = join(projectRoot, `.env.${environment}`);
+  if (!databaseUrl && !process.env[environmentVariable] && existsSync(environmentFile)) {
+    process.loadEnvFile(environmentFile);
   }
 
   const configuredUrl = databaseUrl ?? process.env[environmentVariable];

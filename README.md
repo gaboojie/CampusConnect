@@ -104,27 +104,23 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
 - `migrations/prod/` contains production-safe SQL for Neon `main` and runs separately with `npm run migrate:prod`.
 - Each environment has two files: `001_init.sql` creates the complete schema, and `002_seed.sql` inserts the synthetic grading/demo data.
 - `scripts/migrate.ts` applies files in order and records applied versions in `schema_migrations`.
-- `npm run migrate:dev` automatically uses `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` from `.env.dev` for the connection. For example:
+- `npm run migrate:dev` and `npm run migrate:prod` automatically use `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` from `.env.dev` or `.env.prod`, respectively. For example:
 
   ```sh
   npm run migrate:dev
   ```
 
 - `scripts/reset-database.ts` can drop all tables in the selected database after an exact confirmation prompt. Use it only for an intentional reset.
-- Both dev and prod database commands use `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB`. For production, load `.env.prod` with the Neon `main` connection string before running the command:
+- Both dev and prod database commands use `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` from the selected environment file. For production, verify the Neon `main` connection string in `.env.prod` before running the command:
 
   ```sh
-  set -a
-  source .env.prod
-  set +a
   npm run migrate:prod
-  unset CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB
   ```
 
 - The consolidated migration names are intended for a fresh database. If a database already has the older migration history (`001_schema`, `002_seed`, `003_authentication`, or `004_email_verification`), reset that database before applying the new two-file set.
 - Never run dev migrations against Neon `main` or production migrations against Neon `dev` without reviewing them.
 - The production GitHub Action never runs database migrations. A designated maintainer must run production migrations separately after review, a restore point, and explicit approval.
-- The designated maintainer can run a production migration from a secure terminal after loading `.env.prod`; production migrations must target Neon `main`, not the dev branch.
+- The designated maintainer can run a production migration from a secure terminal using `.env.prod`; production migrations must target Neon `main`, not the dev branch.
 - `.env.dev` and `.env.prod` are ignored and must never be committed.
 - `.env.dev.example` documents local Worker values.
 - `.env.prod.example` documents the migration-only `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB`.
@@ -152,7 +148,11 @@ To reset the dev database, the command automatically uses `CLOUDFLARE_HYPERDRIVE
 npm run db:reset -- --environment dev
 ```
 
-To reset production, use `.env.prod` and type `RESET PROD` when prompted. Verify the Neon branch and database before confirming.
+To reset production, run the command below, then type `RESET PROD` when prompted. It automatically uses `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` from `.env.prod`; verify the Neon branch and database before confirming.
+
+```sh
+npm run db:reset -- --environment prod
+```
 
 ## Project structure
 
