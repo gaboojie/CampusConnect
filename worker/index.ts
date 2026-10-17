@@ -12,6 +12,7 @@ import {
   SESSION_TTL_SECONDS,
   type DatabaseUserRow,
   type PublicUser,
+  validateChangePasswordInput,
   validateSignupInput,
   verifyPassword,
 } from "./auth";
@@ -21,6 +22,41 @@ import {
   type DatabaseClient,
   type DatabaseClientFactory,
 } from "./db";
+import {
+  getResourceDetails,
+  getResourceFilters,
+  parsePositiveId,
+  parseResourceSearch,
+  searchResources,
+} from "./resources";
+import {
+  createListing,
+  deleteListing,
+  getImageMetadata,
+  getOwnedResource,
+  listOwnedResources,
+  parseListingInput,
+  updateListing,
+} from "./listings";
+import { getAnnouncements, parseAnnouncementQuery } from "./announcements";
+import {
+  getStats,
+  getUserDetail,
+  listReservations,
+  listUsers,
+  parseAdminReservationQuery,
+  parseAdminUserQuery,
+} from "./admin";
+import {
+  cancelReservation,
+  createReservation,
+  listMyReservations,
+  parseCreateReservation,
+  parseReservationSlot,
+  rescheduleReservation,
+  type Reservation,
+  type ServiceResult,
+} from "./reservations";
 
 type Bindings = {
   ASSETS: Fetcher;
@@ -218,6 +254,7 @@ async function findAuthenticatedUser(
         u.credit_last_reset,
         u.email_notifications_on,
         u.text_notifications_on,
+        u.can_add_resources,
         u.is_banned
       FROM "Session" AS s
       JOIN "User" AS u ON u.user_id = s.user_id
@@ -286,6 +323,14 @@ export function createApp(options: AppOptions = {}) {
     }
 
     return requireAuthentication(c, next, createDatabaseClient);
+  });
+
+  app.use("/api/admin/*", async (c, next) => {
+    if (c.get("user").role !== "admin") {
+      return c.json({ error: "Administrator access required." }, 403);
+    }
+
+    return next();
   });
 
   const getEmailSender = (c: Context<AppEnv>): VerificationEmailSender =>
@@ -365,7 +410,7 @@ export function createApp(options: AppOptions = {}) {
                   text_notifications_on,
                   email_verified_at
                 )
-                VALUES ($1, $2, $3, $4, 'student', 20, CURRENT_DATE, FALSE, FALSE, $5, $6, NULL)
+                VALUES ($1, $2, $3, $4, 'student', 20, CURRENT_DATE, FALSE, TRUE, $5, $6, NULL)
                 RETURNING
                   user_id,
                   username,
@@ -377,6 +422,7 @@ export function createApp(options: AppOptions = {}) {
                   credit_last_reset,
                   email_notifications_on,
                   text_notifications_on,
+                  can_add_resources,
                   email_verified_at
               `,
               [
@@ -606,6 +652,7 @@ export function createApp(options: AppOptions = {}) {
                 credit_last_reset,
                 email_notifications_on,
                 text_notifications_on,
+                can_add_resources,
                 email_verified_at,
                 password_hash,
                 is_banned
@@ -674,7 +721,464 @@ export function createApp(options: AppOptions = {}) {
     return c.body(null, 204);
   });
 
+  app.post("/api/auth/change-password", async (c) => {
+    const validation = validateChangePasswordInput(await readJson(c));
+
+    if (!validation.ok) {
+      return c.json(
+        { error: "Please correct the highlighted fields.", fieldErrors: validation.fieldErrors },
+        400,
+      );
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    const userId = c.get("user").userId;
+    const currentTokenHash = await hashSessionToken(getCookie(c, SESSION_COOKIE_NAME) ?? "");
+
+    try {
+      const changed = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        async (client) => {
+          const userResult = await client.query<{ password_hash: string | null }>(
+            `SELECT password_hash FROM "User" WHERE user_id = $1`,
+            [userId],
+          );
+
+          if (
+            !(await verifyPassword(
+              validation.value.currentPassword,
+              userResult.rows[0]?.password_hash,
+            ))
+          ) {
+            return false;
+          }
+
+          const passwordHash = await hashPassword(validation.value.newPassword);
+
+          await client.query("BEGIN");
+          try {
+            await client.query(
+              `UPDATE "User" SET password_hash = $1 WHERE user_id = $2`,
+              [passwordHash, userId],
+            );
+            // Other devices are signed out; this session stays.
+            await client.query(
+              `DELETE FROM "Session" WHERE user_id = $1 AND token_hash <> $2::bytea`,
+              [userId, currentTokenHash],
+            );
+            await client.query("COMMIT");
+            return true;
+          } catch (error) {
+            await client.query("ROLLBACK");
+            throw error;
+          }
+        },
+      );
+
+      if (!changed) {
+        return c.json(
+          {
+            error: "Please correct the highlighted fields.",
+            fieldErrors: { currentPassword: "Your current password is incorrect." },
+          },
+          400,
+        );
+      }
+
+      return c.json({ message: "Your password has been updated." });
+    } catch {
+      return c.json({ error: "Unable to change your password right now." }, 503);
+    }
+  });
+
   app.get("/api/auth/me", (c) => c.json({ user: c.get("user") }));
+
+  app.get("/api/resources", async (c) => {
+    const search = parseResourceSearch(new URL(c.req.url).searchParams);
+
+    if (!search.ok) {
+      return c.json({ error: search.error }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => searchResources(client, search.value),
+      );
+      return c.json(result);
+    } catch {
+      return c.json({ error: "Unable to load resources right now." }, 503);
+    }
+  });
+
+  app.get("/api/resources/filters", async (c) => {
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const filters = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getResourceFilters(client),
+      );
+      return c.json(filters);
+    } catch {
+      return c.json({ error: "Unable to load filters right now." }, 503);
+    }
+  });
+
+  app.get("/api/resources/:id", async (c) => {
+    const resourceId = parsePositiveId(c.req.param("id"));
+
+    if (resourceId === null) {
+      return c.json({ error: "Resource id must be a positive whole number." }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const resource = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getResourceDetails(client, resourceId),
+      );
+
+      if (!resource) {
+        return c.json({ error: "Resource not found." }, 404);
+      }
+
+      return c.json({ resource });
+    } catch {
+      return c.json({ error: "Unable to load this resource right now." }, 503);
+    }
+  });
+
+  app.get("/api/listings", async (c) => {
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const listings = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => listOwnedResources(client, c.get("user").userId),
+      );
+      return c.json({ listings });
+    } catch {
+      return c.json({ error: "Unable to load your listings right now." }, 503);
+    }
+  });
+
+  app.get("/api/listings/:id", async (c) => {
+    const resourceId = parsePositiveId(c.req.param("id"));
+    if (resourceId === null) return c.json({ error: "Listing id must be a positive whole number." }, 400);
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getOwnedResource(client, resourceId, c.get("user").userId),
+      );
+      if (!result.ok) return c.json({ error: result.error }, result.status);
+      return c.json({ listing: result.value });
+    } catch {
+      return c.json({ error: "Unable to load this listing right now." }, 503);
+    }
+  });
+
+  async function readListingForm(c: Context<AppEnv>): Promise<Record<string, unknown>> {
+    try {
+      const body = await c.req.parseBody({ all: true });
+      return body as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+
+  app.post("/api/listings", async (c) => {
+    const user = c.get("user");
+    if (!user.canAddResources) return c.json({ error: "Your account cannot add resources." }, 403);
+    const parsed = parseListingInput(await readListingForm(c));
+    if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => createListing(client, c.env.RESOURCE_IMAGES, user.userId, parsed.value),
+      );
+      if (!result.ok) return c.json({ error: result.error }, result.status);
+      return c.json({ listing: result.value }, 201);
+    } catch {
+      return c.json({ error: "Unable to create the listing right now." }, 503);
+    }
+  });
+
+  app.patch("/api/listings/:id", async (c) => {
+    const resourceId = parsePositiveId(c.req.param("id"));
+    if (resourceId === null) return c.json({ error: "Listing id must be a positive whole number." }, 400);
+    const parsed = parseListingInput(await readListingForm(c));
+    if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => updateListing(client, c.env.RESOURCE_IMAGES, c.get("user").userId, resourceId, parsed.value),
+      );
+      if (!result.ok) return c.json({ error: result.error }, result.status);
+      return c.json({ listing: result.value });
+    } catch {
+      return c.json({ error: "Unable to update the listing right now." }, 503);
+    }
+  });
+
+  app.delete("/api/listings/:id", async (c) => {
+    const resourceId = parsePositiveId(c.req.param("id"));
+    if (resourceId === null) return c.json({ error: "Listing id must be a positive whole number." }, 400);
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => deleteListing(client, c.env.RESOURCE_IMAGES, c.get("user").userId, resourceId),
+      );
+      if (!result.ok) return c.json({ error: result.error }, result.status);
+      return c.body(null, 204);
+    } catch {
+      return c.json({ error: "Unable to delete the listing right now." }, 503);
+    }
+  });
+
+  app.get("/api/resource-images/:id", async (c) => {
+    const imageId = parsePositiveId(c.req.param("id"));
+    if (imageId === null) return c.json({ error: "Image id must be a positive whole number." }, 400);
+    if (!c.env.DB || !c.env.RESOURCE_IMAGES) return c.notFound();
+
+    try {
+      const metadata = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getImageMetadata(client, imageId),
+      );
+      if (!metadata) return c.notFound();
+      const object = await c.env.RESOURCE_IMAGES.get(metadata.objectKey);
+      if (!object) return c.notFound();
+      return new Response(object.body, {
+        headers: {
+          "Content-Type": object.httpMetadata?.contentType ?? metadata.contentType,
+          "Content-Disposition": `inline; filename="${metadata.filename.replace(/[\"\\]/g, "_")}"`,
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
+    } catch {
+      return c.json({ error: "Unable to load this image right now." }, 503);
+    }
+  });
+
+  app.get("/api/announcements", async (c) => {
+    const query = parseAnnouncementQuery(new URL(c.req.url).searchParams);
+
+    if (!query.ok) {
+      return c.json({ error: query.error }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const announcements = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getAnnouncements(client, query.value),
+      );
+      return c.json({ announcements });
+    } catch {
+      return c.json({ error: "Unable to load announcements right now." }, 503);
+    }
+  });
+
+  const runReservationWrite = async (
+    c: Context<AppEnv>,
+    successStatus: 200 | 201,
+    work: (client: DatabaseClient) => Promise<ServiceResult<Reservation>>,
+  ) => {
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const result = await withDatabase(c.env.DB.connectionString, createDatabaseClient, work);
+
+      if (!result.ok) {
+        return c.json({ error: result.error }, result.status);
+      }
+      return c.json({ reservation: result.value }, successStatus);
+    } catch {
+      return c.json({ error: "Unable to save the reservation right now." }, 503);
+    }
+  };
+
+  app.post("/api/reservations", async (c) => {
+    const input = parseCreateReservation(await readJson(c));
+
+    if (!input.ok) {
+      return c.json({ error: input.error }, 400);
+    }
+
+    const userId = c.get("user").userId;
+    return runReservationWrite(c, 201, (client) =>
+      createReservation(client, userId, input.value),
+    );
+  });
+
+  app.get("/api/reservations/mine", async (c) => {
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const reservations = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => listMyReservations(client, c.get("user").userId),
+      );
+      return c.json(reservations);
+    } catch {
+      return c.json({ error: "Unable to load your reservations right now." }, 503);
+    }
+  });
+
+  app.patch("/api/reservations/:id", async (c) => {
+    const reservationId = parsePositiveId(c.req.param("id"));
+
+    if (reservationId === null) {
+      return c.json({ error: "Reservation id must be a positive whole number." }, 400);
+    }
+
+    const slot = parseReservationSlot(await readJson(c));
+    if (!slot.ok) {
+      return c.json({ error: slot.error }, 400);
+    }
+
+    const userId = c.get("user").userId;
+    return runReservationWrite(c, 200, (client) =>
+      rescheduleReservation(client, userId, reservationId, slot.value),
+    );
+  });
+
+  app.post("/api/reservations/:id/cancel", async (c) => {
+    const reservationId = parsePositiveId(c.req.param("id"));
+
+    if (reservationId === null) {
+      return c.json({ error: "Reservation id must be a positive whole number." }, 400);
+    }
+
+    const userId = c.get("user").userId;
+    return runReservationWrite(c, 200, (client) =>
+      cancelReservation(client, userId, reservationId),
+    );
+  });
+
+  app.get("/api/admin/stats", async (c) => {
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const stats = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getStats(client),
+      );
+      return c.json({ stats });
+    } catch {
+      return c.json({ error: "Unable to load statistics right now." }, 503);
+    }
+  });
+
+  app.get("/api/admin/users", async (c) => {
+    const query = parseAdminUserQuery(new URL(c.req.url).searchParams);
+
+    if (!query.ok) {
+      return c.json({ error: query.error }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const users = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => listUsers(client, query.value),
+      );
+      return c.json(users);
+    } catch {
+      return c.json({ error: "Unable to load users right now." }, 503);
+    }
+  });
+
+  app.get("/api/admin/users/:id", async (c) => {
+    const userId = parsePositiveId(c.req.param("id"));
+
+    if (userId === null) {
+      return c.json({ error: "User id must be a positive whole number." }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const user = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getUserDetail(client, userId),
+      );
+
+      if (!user) {
+        return c.json({ error: "User not found." }, 404);
+      }
+
+      return c.json({ user });
+    } catch {
+      return c.json({ error: "Unable to load this user right now." }, 503);
+    }
+  });
+
+  app.get("/api/admin/reservations", async (c) => {
+    const query = parseAdminReservationQuery(new URL(c.req.url).searchParams);
+
+    if (!query.ok) {
+      return c.json({ error: query.error }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const reservations = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => listReservations(client, query.value),
+      );
+      return c.json(reservations);
+    } catch {
+      return c.json({ error: "Unable to load reservations right now." }, 503);
+    }
+  });
 
   app.all("*", async (c) => {
     const response = await c.env.ASSETS.fetch(c.req.raw);

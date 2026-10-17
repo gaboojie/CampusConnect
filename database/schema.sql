@@ -61,7 +61,7 @@ CREATE TABLE "User" (
     credit_balance          integer       NOT NULL,
     credit_last_reset       date          NOT NULL,
     is_banned               boolean       NOT NULL,
-    can_add_resources       boolean       NOT NULL,
+    can_add_resources       boolean       NOT NULL DEFAULT TRUE,
     email_notifications_on  boolean       NOT NULL,
     text_notifications_on   boolean       NOT NULL,
     profile_image_id        integer,
@@ -140,8 +140,6 @@ CREATE TABLE "Resource" (
     name                  varchar        NOT NULL,
     description           text           NOT NULL,
     location_description  text           NOT NULL,
-    latitude              decimal(9, 6)  NOT NULL,
-    longitude             decimal(9, 6)  NOT NULL,
     max_reservation_time  interval,
     required_credits      integer        NOT NULL,
     capacity              integer        NOT NULL,
@@ -150,6 +148,8 @@ CREATE TABLE "Resource" (
 
     CONSTRAINT pk_resource                   PRIMARY KEY (resource_id),
     CONSTRAINT uq_resource_resource_image_id UNIQUE (resource_image_id),
+    CONSTRAINT ck_resource_required_credits CHECK (required_credits BETWEEN 1 AND 20),
+    CONSTRAINT ck_resource_capacity CHECK (capacity BETWEEN 1 AND 100),
 
     -- An owner with listed resources cannot be deleted; reassign or remove
     -- the resources first.
@@ -198,6 +198,19 @@ CREATE TABLE "ResourceAvailability" (
     repeats_offset   interval,
 
     CONSTRAINT pk_resourceavailability PRIMARY KEY (availability_id),
+    CONSTRAINT ck_resourceavailability_time_order
+        CHECK (end_time > start_time),
+    CONSTRAINT ck_resourceavailability_repeat_pair
+        CHECK ((repeats_offset IS NULL AND repeats_until IS NULL)
+            OR (repeats_offset IS NOT NULL AND repeats_until IS NOT NULL)),
+    CONSTRAINT ck_resourceavailability_repeat_interval
+        CHECK (repeats_offset IS NULL OR repeats_offset IN (
+            interval '1 day', interval '2 days', interval '7 days', interval '14 days'
+        )),
+    CONSTRAINT ck_resourceavailability_repeats_until
+        CHECK (repeats_until IS NULL OR repeats_until > end_time),
+    CONSTRAINT ck_resourceavailability_duration
+        CHECK (repeats_offset IS NULL OR end_time - start_time <= repeats_offset),
 
     CONSTRAINT fk_resourceavailability_resource
         FOREIGN KEY (resource_id) REFERENCES "Resource" (resource_id)
@@ -241,7 +254,7 @@ CREATE TABLE "Reservation" (
         ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT fk_reservation_resource
         FOREIGN KEY (resource_id) REFERENCES "Resource" (resource_id)
-        ON UPDATE CASCADE ON DELETE RESTRICT
+        ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 -- -----------------------------------------------------------------------------

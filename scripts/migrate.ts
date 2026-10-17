@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,6 +27,14 @@ function getDatabaseUrl(environment: MigrationEnvironment): string {
   const databaseUrlFromArgs =
     databaseUrlIndex >= 0 ? process.argv[databaseUrlIndex + 1] : undefined;
   const environmentVariable = "CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB";
+
+  // Load the selected environment's local Hyperdrive connection string when
+  // it has not already been exported or passed explicitly.
+  const environmentFile = join(projectRoot, `.env.${environment}`);
+  if (!databaseUrlFromArgs && !process.env[environmentVariable] && existsSync(environmentFile)) {
+    process.loadEnvFile(environmentFile);
+  }
+
   const databaseUrl = databaseUrlFromArgs ?? process.env[environmentVariable];
 
   if (!databaseUrl || databaseUrl.startsWith("--")) {

@@ -8,6 +8,7 @@ import {
   isVtEmail,
   type DatabaseUserRow,
   type SignupInput,
+  validateChangePasswordInput,
   validateSignupInput,
   verifyPassword,
 } from "../worker/auth";
@@ -93,6 +94,7 @@ class FakeClient implements DatabaseClient {
         credit_last_reset: createdAt,
         email_notifications_on: emailNotificationsOn,
         text_notifications_on: textNotificationsOn,
+        can_add_resources: true,
         email_verified_at: null,
         is_banned: false,
       } satisfies DatabaseUserRow & { password_hash: string | null };
@@ -247,6 +249,32 @@ describe("authentication helpers", () => {
       expect(result.fieldErrors.email).toBeDefined();
       expect(result.fieldErrors.confirmPassword).toBeDefined();
     }
+  });
+
+  it("validates password changes", () => {
+    const valid = {
+      currentPassword: "old-password",
+      newPassword: "new-password",
+      confirmPassword: "new-password",
+    };
+
+    expect(validateChangePasswordInput(valid)).toEqual({ ok: true, value: valid });
+
+    const result = validateChangePasswordInput({
+      currentPassword: "",
+      newPassword: "short",
+      confirmPassword: "different",
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.fieldErrors.currentPassword).toBeDefined();
+      expect(result.fieldErrors.newPassword).toBeDefined();
+      expect(result.fieldErrors.confirmPassword).toBeDefined();
+    }
+
+    const same = validateChangePasswordInput({ ...valid, newPassword: "old-password", confirmPassword: "old-password" });
+    expect(same.ok).toBe(false);
   });
 
   it("hashes and verifies passwords while rejecting malformed hashes", async () => {
