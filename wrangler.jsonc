@@ -1,7 +1,7 @@
 {
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	"name": "campusconnect",
-	"main": "worker/index.ts",
+	"main": "backend/index.ts",
 	"compatibility_date": "2026-10-08",
 	"compatibility_flags": [
 		"nodejs_compat_v2"

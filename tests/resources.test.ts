@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createApp } from "../worker/index";
+import { createApp } from "../backend/index";
 import {
   buildResourceSearchQueries,
   parseResourceSearch,
   shortenDescription,
   type ResourceSearch,
-} from "../worker/resources";
+} from "../db/repositories/resources";
 import { FakeReadDatabase, authHeaders, expectReadOnly } from "./support/fakeReadDatabase";
 
 const summaryRow = {

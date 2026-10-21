@@ -1,4 +1,4 @@
-import type { DatabaseClient } from "./db";
+import type { DatabaseClient } from "../client";
 import {
   AVAILABILITY_REPEAT_INTERVALS,
   AVAILABILITY_REPEATS,
@@ -134,10 +134,11 @@ function parseAvailability(value: unknown): Validation<AvailabilityInput[] | nul
       return { ok: false, error: "Availability end time must be after its start time." };
     }
 
-    const repeat = typeof row.repeat === "string" ? row.repeat as AvailabilityRepeat : "";
-    if (!AVAILABILITY_REPEATS.includes(repeat as AvailabilityRepeat)) {
+    const rawRepeat = typeof row.repeat === "string" ? row.repeat : "";
+    if (!AVAILABILITY_REPEATS.includes(rawRepeat as AvailabilityRepeat)) {
       return { ok: false, error: "Choose a valid availability repeat option." };
     }
+    const repeat = rawRepeat as AvailabilityRepeat;
 
     const rawRepeatsUntil = row.repeatsUntil;
     const repeatsUntil = rawRepeatsUntil === null || rawRepeatsUntil === undefined || rawRepeatsUntil === ""
@@ -223,7 +224,7 @@ export function parseListingInput(body: Record<string, unknown>): Validation<Lis
       capacity: capacity!,
       maxReservationMinutes:
         hours === null && minutes === null ? null : (hours ?? 0) * 60 + (minutes ?? 0),
-      availability: availability.value,
+      availability: availability.ok ? availability.value : null,
       image: image!,
       removeImage: text(body, "removeImage") === "true",
     },
@@ -279,29 +280,6 @@ async function bestEffortDelete(bucket: R2Bucket | undefined, key: string | null
   } catch (error) {
     console.error(`R2 cleanup failed for ${key}:`, error);
   }
-}
-
-async function activeReservation(
-  client: DatabaseClient,
-  resourceId: number,
-): Promise<{ startTime: string; endTime: string } | null> {
-  const result = await client.query<{ start_time: string; end_time: string }>(
-    `
-      SELECT
-        ${localTimestampSql("start_time")} AS start_time,
-        ${localTimestampSql("end_time")} AS end_time
-      FROM "Reservation"
-      WHERE resource_id = $1
-        AND status = 'confirmed'
-        AND start_time <= ${CAMPUS_NOW_SQL}
-        AND end_time > ${CAMPUS_NOW_SQL}
-      ORDER BY start_time, reservation_id
-      LIMIT 1
-    `,
-    [resourceId],
-  );
-  const row = result.rows[0];
-  return row ? { startTime: row.start_time, endTime: row.end_time } : null;
 }
 
 function activeMessage(reservation: { startTime: string; endTime: string }): string {

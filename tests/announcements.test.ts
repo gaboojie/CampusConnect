@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createApp } from "../worker/index";
-import { parseAnnouncementQuery } from "../worker/announcements";
+import { createApp } from "../backend/index";
+import { parseAnnouncementQuery } from "../db/repositories/announcements";
 import { FakeReadDatabase, authHeaders, expectReadOnly } from "./support/fakeReadDatabase";
 
 const maintenanceRow = {

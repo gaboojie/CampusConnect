@@ -7,7 +7,7 @@ import { Client } from "pg";
 
 type DatabaseEnvironment = "dev" | "prod";
 
-const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 const resetPublicTablesSql = `
 DO $$

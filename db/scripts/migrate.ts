@@ -4,7 +4,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "pg";
 
-const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 type MigrationEnvironment = "dev" | "prod";
 
@@ -48,7 +48,7 @@ function getDatabaseUrl(environment: MigrationEnvironment): string {
 
 async function main(): Promise<void> {
   const environment = getMigrationEnvironment();
-  const migrationsDirectory = join(projectRoot, "migrations", environment);
+  const migrationsDirectory = join(projectRoot, "db", "migrations");
   const client = new Client({ connectionString: getDatabaseUrl(environment) });
   await client.connect();
 

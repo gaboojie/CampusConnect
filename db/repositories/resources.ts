@@ -1,4 +1,4 @@
-import type { DatabaseClient } from "./db";
+import type { DatabaseClient } from "../client";
 
 // Timestamps are stored as campus wall-clock time (timestamp without time zone),
 // so "now" must be converted to campus time instead of using the server clock.

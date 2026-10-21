@@ -10,7 +10,6 @@ import {
   serializeUser,
   SESSION_COOKIE_NAME,
   SESSION_TTL_SECONDS,
-  type DatabaseUserRow,
   type PublicUser,
   validateChangePasswordInput,
   validateSignupInput,
@@ -21,14 +20,26 @@ import {
   withDatabase,
   type DatabaseClient,
   type DatabaseClientFactory,
-} from "./db";
+} from "../db/client";
+import {
+  createSessionRecord,
+  createSignupRecord,
+  createVerificationTokenRecord,
+  deleteSession,
+  findAuthenticatedUser,
+  findLoginUser,
+  getPasswordHash,
+  healthCheck,
+  updatePassword,
+  verifyEmailToken,
+} from "../db/repositories/auth";
 import {
   getResourceDetails,
   getResourceFilters,
   parsePositiveId,
   parseResourceSearch,
   searchResources,
-} from "./resources";
+} from "../db/repositories/resources";
 import {
   createListing,
   deleteListing,
@@ -37,8 +48,8 @@ import {
   listOwnedResources,
   parseListingInput,
   updateListing,
-} from "./listings";
-import { getAnnouncements, parseAnnouncementQuery } from "./announcements";
+} from "../db/repositories/listings";
+import { getAnnouncements, parseAnnouncementQuery } from "../db/repositories/announcements";
 import {
   getStats,
   getUserDetail,
@@ -46,7 +57,7 @@ import {
   listUsers,
   parseAdminReservationQuery,
   parseAdminUserQuery,
-} from "./admin";
+} from "../db/repositories/admin";
 import {
   cancelReservation,
   createReservation,
@@ -56,7 +67,7 @@ import {
   rescheduleReservation,
   type Reservation,
   type ServiceResult,
-} from "./reservations";
+} from "../db/repositories/reservations";
 
 type Bindings = {
   ASSETS: Fetcher;
@@ -217,58 +228,6 @@ async function sendVerificationEmail(
   }
 }
 
-async function createSession(
-  client: DatabaseClient,
-  userId: number,
-): Promise<{ token: string; expiresAt: Date }> {
-  const token = await createSessionToken();
-  const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
-  const tokenHash = await hashSessionToken(token);
-
-  await client.query(
-    `
-      INSERT INTO "Session" (user_id, token_hash, expires_at)
-      VALUES ($1, $2::bytea, $3)
-    `,
-    [userId, tokenHash, expiresAt],
-  );
-
-  return { token, expiresAt };
-}
-
-async function findAuthenticatedUser(
-  client: DatabaseClient,
-  token: string,
-): Promise<DatabaseUserRow | null> {
-  const tokenHash = await hashSessionToken(token);
-  const result = await client.query<DatabaseUserRow>(
-    `
-      SELECT
-        u.user_id,
-        u.username,
-        u.email,
-        u.phone_number,
-        u.role,
-        u.created_at,
-        u.credit_balance,
-        u.credit_last_reset,
-        u.email_notifications_on,
-        u.text_notifications_on,
-        u.can_add_resources,
-        u.is_banned
-      FROM "Session" AS s
-      JOIN "User" AS u ON u.user_id = s.user_id
-      WHERE s.token_hash = $1::bytea
-        AND s.expires_at > CURRENT_TIMESTAMP
-        AND u.is_banned = FALSE
-      LIMIT 1
-    `,
-    [tokenHash],
-  );
-
-  return result.rows[0] ?? null;
-}
-
 function setSessionCookie(
   c: Context<AppEnv>,
   token: string,
@@ -292,10 +251,11 @@ async function requireAuthentication(
   }
 
   try {
+    const tokenHash = await hashSessionToken(token);
     const user = await withDatabase(
       c.env.DB.connectionString,
       createDatabaseClient,
-      (client) => findAuthenticatedUser(client, token),
+      (client) => findAuthenticatedUser(client, tokenHash),
     );
 
     if (!user) {
@@ -351,7 +311,7 @@ export function createApp(options: AppOptions = {}) {
       await withDatabase(
         c.env.DB.connectionString,
         createDatabaseClient,
-        (client) => client.query("SELECT 1"),
+        (client) => healthCheck(client),
       );
 
       return c.json({
@@ -390,82 +350,22 @@ export function createApp(options: AppOptions = {}) {
       const result = await withDatabase(
         c.env.DB.connectionString,
         createDatabaseClient,
-        async (client) => {
-          await client.query("BEGIN");
-
-          try {
-            const userResult = await client.query<DatabaseUserRow>(
-              `
-                INSERT INTO "User" (
-                  username,
-                  email,
-                  password_hash,
-                  phone_number,
-                  role,
-                  credit_balance,
-                  credit_last_reset,
-                  is_banned,
-                  can_add_resources,
-                  email_notifications_on,
-                  text_notifications_on,
-                  email_verified_at
-                )
-                VALUES ($1, $2, $3, $4, 'student', 20, CURRENT_DATE, FALSE, TRUE, $5, $6, NULL)
-                RETURNING
-                  user_id,
-                  username,
-                  email,
-                  phone_number,
-                  role,
-                  created_at,
-                  credit_balance,
-                  credit_last_reset,
-                  email_notifications_on,
-                  text_notifications_on,
-                  can_add_resources,
-                  email_verified_at
-              `,
-              [
-                validation.value.username,
-                validation.value.email,
-                passwordHash,
-                validation.value.phoneNumber,
-                validation.value.emailNotificationsOn,
-                validation.value.textNotificationsOn,
-              ],
-            );
-            const user = userResult.rows[0];
-
-            await client.query(
-              `
-                INSERT INTO "CreditTransaction" (user_id, amount, transaction_type)
-                VALUES ($1, 20, 'initial_grant')
-              `,
-              [user.user_id],
-            );
-
-            await client.query(
-              `
-                INSERT INTO "EmailVerificationToken" (user_id, token_hash)
-                VALUES ($1, $2::bytea)
-              `,
-              [user.user_id, verificationTokenHash],
-            );
-
-            await client.query("COMMIT");
-
-            return { user };
-          } catch (error) {
-            await client.query("ROLLBACK");
-            throw error;
-          }
-        },
+        (client) =>
+          createSignupRecord(client, {
+            username: validation.value.username,
+            email: validation.value.email,
+            passwordHash,
+            phoneNumber: validation.value.phoneNumber,
+            emailNotificationsOn: validation.value.emailNotificationsOn,
+            textNotificationsOn: validation.value.textNotificationsOn,
+            verificationTokenHash,
+          }),
       );
 
       await sendVerificationEmail(getEmailSender(c), {
-        email: result.user.email,
+        email: result.email,
         token: verificationToken,
-        userId: result.user.user_id,
+        userId: result.user_id,
       });
       return c.json({ message: VERIFICATION_MESSAGE }, 201);
     } catch (error) {
@@ -493,50 +393,7 @@ export function createApp(options: AppOptions = {}) {
       const verified = await withDatabase(
         c.env.DB.connectionString,
         createDatabaseClient,
-        async (client) => {
-          await client.query("BEGIN");
-
-          try {
-            const tokenResult = await client.query<{ token_id: number; user_id: number }>(
-              `
-                SELECT token_id, user_id
-                FROM "EmailVerificationToken"
-                WHERE token_hash = $1::bytea
-                  AND used_at IS NULL
-                FOR UPDATE
-              `,
-              [tokenHash],
-            );
-            const tokenRow = tokenResult.rows[0];
-
-            if (!tokenRow) {
-              await client.query("COMMIT");
-              return false;
-            }
-
-            await client.query(
-              `
-                UPDATE "EmailVerificationToken"
-                SET used_at = CURRENT_TIMESTAMP
-                WHERE token_id = $1 AND used_at IS NULL
-              `,
-              [tokenRow.token_id],
-            );
-            await client.query(
-              `
-                UPDATE "User"
-                SET email_verified_at = CURRENT_TIMESTAMP
-                WHERE user_id = $1
-              `,
-              [tokenRow.user_id],
-            );
-            await client.query("COMMIT");
-            return true;
-          } catch (error) {
-            await client.query("ROLLBACK");
-            throw error;
-          }
-        },
+        (client) => verifyEmailToken(client, tokenHash),
       );
 
       if (!verified) {
@@ -560,60 +417,21 @@ export function createApp(options: AppOptions = {}) {
       return databaseUnavailable(c);
     }
 
+    const token = await createEmailVerificationToken();
+    const tokenHash = await hashEmailVerificationToken(token);
+
     try {
       const result = await withDatabase(
         c.env.DB.connectionString,
         createDatabaseClient,
-        async (client) => {
-          await client.query("BEGIN");
-
-          try {
-            const userResult = await client.query<DatabaseUserRow>(
-              `
-                SELECT user_id, email, email_verified_at, is_banned
-                FROM "User"
-                WHERE LOWER(email) = LOWER($1)
-                LIMIT 1
-              `,
-              [email],
-            );
-            const user = userResult.rows[0];
-
-            if (!user || user.email_verified_at || user.is_banned) {
-              await client.query("COMMIT");
-              return null;
-            }
-
-            await client.query(
-              `
-                UPDATE "EmailVerificationToken"
-                SET used_at = CURRENT_TIMESTAMP
-                WHERE user_id = $1 AND used_at IS NULL
-              `,
-              [user.user_id],
-            );
-
-            const token = await createEmailVerificationToken();
-            const tokenHash = await hashEmailVerificationToken(token);
-            await client.query(
-              `
-                INSERT INTO "EmailVerificationToken" (user_id, token_hash)
-                VALUES ($1, $2::bytea)
-              `,
-              [user.user_id, tokenHash],
-            );
-            await client.query("COMMIT");
-
-            return { email: user.email, token, userId: user.user_id };
-          } catch (error) {
-            await client.query("ROLLBACK");
-            throw error;
-          }
-        },
+        (client) => createVerificationTokenRecord(client, email, tokenHash),
       );
 
       if (result) {
-        await sendVerificationEmail(getEmailSender(c), result);
+        await sendVerificationEmail(getEmailSender(c), {
+          ...result,
+          token,
+        });
       }
 
       return c.json({ message: VERIFICATION_MESSAGE }, 202);
@@ -639,30 +457,7 @@ export function createApp(options: AppOptions = {}) {
         c.env.DB.connectionString,
         createDatabaseClient,
         async (client) => {
-          const userResult = await client.query<DatabaseUserRow>(
-            `
-              SELECT
-                user_id,
-                username,
-                email,
-                phone_number,
-                role,
-                created_at,
-                credit_balance,
-                credit_last_reset,
-                email_notifications_on,
-                text_notifications_on,
-                can_add_resources,
-                email_verified_at,
-                password_hash,
-                is_banned
-              FROM "User"
-              WHERE LOWER(email) = LOWER($1) OR username = $1
-              LIMIT 1
-            `,
-            [identifier],
-          );
-          const user = userResult.rows[0];
+          const user = await findLoginUser(client, identifier);
 
           if (
             !user ||
@@ -673,15 +468,11 @@ export function createApp(options: AppOptions = {}) {
             return null;
           }
 
-          await client.query("BEGIN");
-          try {
-            const session = await createSession(client, user.user_id);
-            await client.query("COMMIT");
-            return { session, user };
-          } catch (error) {
-            await client.query("ROLLBACK");
-            throw error;
-          }
+          const token = await createSessionToken();
+          const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
+          const tokenHash = await hashSessionToken(token);
+          await createSessionRecord(client, user.user_id, tokenHash, expiresAt);
+          return { session: { token, expiresAt }, user };
         },
       );
 
@@ -705,11 +496,7 @@ export function createApp(options: AppOptions = {}) {
         await withDatabase(
           c.env.DB.connectionString,
           createDatabaseClient,
-          (client) =>
-            client.query(
-              `DELETE FROM "Session" WHERE token_hash = $1::bytea`,
-              [tokenHash],
-            ),
+          (client) => deleteSession(client, tokenHash),
         );
       } catch {
         clearSessionCookie(c);
@@ -742,39 +529,20 @@ export function createApp(options: AppOptions = {}) {
         c.env.DB.connectionString,
         createDatabaseClient,
         async (client) => {
-          const userResult = await client.query<{ password_hash: string | null }>(
-            `SELECT password_hash FROM "User" WHERE user_id = $1`,
-            [userId],
-          );
+          const passwordHash = await getPasswordHash(client, userId);
 
           if (
             !(await verifyPassword(
               validation.value.currentPassword,
-              userResult.rows[0]?.password_hash,
+              passwordHash,
             ))
           ) {
             return false;
           }
 
-          const passwordHash = await hashPassword(validation.value.newPassword);
-
-          await client.query("BEGIN");
-          try {
-            await client.query(
-              `UPDATE "User" SET password_hash = $1 WHERE user_id = $2`,
-              [passwordHash, userId],
-            );
-            // Other devices are signed out; this session stays.
-            await client.query(
-              `DELETE FROM "Session" WHERE user_id = $1 AND token_hash <> $2::bytea`,
-              [userId, currentTokenHash],
-            );
-            await client.query("COMMIT");
-            return true;
-          } catch (error) {
-            await client.query("ROLLBACK");
-            throw error;
-          }
+          const nextPasswordHash = await hashPassword(validation.value.newPassword);
+          await updatePassword(client, userId, nextPasswordHash, currentTokenHash);
+          return true;
         },
       );
 
