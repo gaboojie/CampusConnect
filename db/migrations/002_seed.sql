@@ -2,9 +2,8 @@
 -- CampusConnect: Location-Aware Campus Resource Reservation System
 -- Phase 4 - Seed data (PostgreSQL)
 --
--- Run on a fresh database immediately after schema.sql:
---   psql -v ON_ERROR_STOP=1 -d <test_db> -f database/schema.sql
---   psql -v ON_ERROR_STOP=1 -d <test_db> -f database/seed.sql
+-- Run on a fresh database immediately after 001_schema.sql:
+--   npm run migrate:dev
 --
 -- Snapshot: the data represents CampusConnect as of 2026-10-11 12:00
 -- (America/New_York local time; columns are timestamp without time zone).
@@ -16,7 +15,7 @@
 -- lib.vt.edu. Every reservable unit (e.g. "Group Study Room 4"), capacity,
 -- credit price, availability window, maintenance period, user, reservation,
 -- review, notification, session, and image record is SIMULATED.
--- See database/data_sources.txt for sources and assumptions.
+-- See db/reference/vt_data_sources.txt for sources and assumptions.
 --
 -- Credit rules used (assumptions; not defined in the Phase 3 documents):
 --   * New accounts receive 20 credits ('initial_grant').

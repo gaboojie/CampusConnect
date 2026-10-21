@@ -11,15 +11,15 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
-    "typecheck": "tsc --noEmit",
+    "check": "svelte-check --tsconfig ./frontend/tsconfig.json && tsc -p tsconfig.node.json",
+    "typecheck": "tsc -p backend/tsconfig.json --noEmit",
     "test": "vitest run",
     "worker:dev": "CLOUDFLARE_ENV=dev wrangler dev --env dev",
     "worker:deploy:production": "wrangler deploy --env production",
-    "migrate": "tsx scripts/migrate.ts --environment dev",
-    "migrate:dev": "tsx scripts/migrate.ts --environment dev",
-    "migrate:prod": "tsx scripts/migrate.ts --environment prod",
-    "db:reset": "tsx scripts/reset-database.ts"
+    "migrate": "tsx db/scripts/migrate.ts --environment dev",
+    "migrate:dev": "tsx db/scripts/migrate.ts --environment dev",
+    "migrate:prod": "tsx db/scripts/migrate.ts --environment prod",
+    "db:reset": "tsx db/scripts/reset-database.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261008.1",

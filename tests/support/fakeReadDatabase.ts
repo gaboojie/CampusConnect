@@ -1,5 +1,5 @@
-import { hashSessionToken, type DatabaseUserRow } from "../../worker/auth";
-import type { DatabaseClient, DatabaseQueryResult } from "../../worker/db";
+import { hashSessionToken, type DatabaseUserRow } from "../../backend/auth";
+import type { DatabaseClient, DatabaseQueryResult } from "../../db/client";
 
 export const SESSION_TOKEN = "test-session-token";
 

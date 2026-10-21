@@ -1,4 +1,4 @@
-import type { DatabaseClient } from "./db";
+import type { DatabaseClient } from "../client";
 import type { Validation } from "./resources";
 
 // Read-only queries behind the /api/admin/* endpoints. The password hash, session

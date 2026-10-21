@@ -2,19 +2,19 @@
 
 We are implementing **Phase 4: Database Initialization & Working Application** for our CampusConnect project, a Location-Aware Campus Resource Reservation System.
 
-I have already generated `database/schema.sql`. Your task is to generate two files:
+I have already generated `db/migrations/001_schema.sql`. Your task is to generate the seed migration and its provenance notes:
 
-1. `database/seed.sql` — Realistic, consistent synthetic data for all tables.
-2. `database/data_sources.txt` — Documentation of real-world information, sources, assumptions, and AI-generated data.
+1. `db/migrations/002_seed.sql` — Realistic, consistent synthetic data for all tables.
+2. `db/reference/vt_data_sources.txt` — Documentation of real-world information, sources, assumptions, and AI-generated data.
 
-**Do not modify `schema.sql` without my permission.**
+**Do not modify `001_schema.sql` without my permission.**
 
 ## Step 1: Understand the existing database
 
 First, carefully read:
 
-- `database/schema.sql` — The authoritative physical schema.
-- `database/phase3_schema.dbml` — Our finalized Phase 3 logical schema.
+- `db/migrations/001_schema.sql` — The authoritative physical schema.
+- The approved Phase 3 logical schema — Our finalized Phase 3 logical schema.
 - `phase3_documentation.pdf` — Business rules, referential actions, and general constraints.
 
 Understand all 14 tables, their relationships, primary keys, foreign keys, `NOT NULL`, `UNIQUE`, `CHECK`, and other constraints.
@@ -169,7 +169,7 @@ For `Session`, use unique synthetic binary token hashes consistent with PostgreS
 
 ## Step 6: Generate `data_sources.txt`
 
-Create `database/data_sources.txt` documenting all real-world information used to generate the dataset.
+Create `db/reference/vt_data_sources.txt` documenting all real-world information used to generate the dataset.
 
 For each real building or facility, include:
 
@@ -195,7 +195,7 @@ Also document:
 
 ## Step 7: Generate `seed.sql`
 
-After planning the data, create `database/seed.sql`.
+After planning the data, create `db/migrations/002_seed.sql`.
 
 Requirements:
 
@@ -206,7 +206,7 @@ Requirements:
 5. Handle explicit IDs and identity sequences correctly.
 6. Use readable, organized SQL with comments where useful.
 7. Preserve realistic relationships among users, buildings, resources, reservations, transactions, reviews, notifications, and other records.
-8. Ensure that the seed data works on a fresh database immediately after running `schema.sql`.
+8. Ensure that the seed data works on a fresh database immediately after running `001_schema.sql`.
 9. Do not include intentionally invalid records in this file.
 10. Do not modify or delete data in an existing non-test database.
 
@@ -221,7 +221,7 @@ After generating the files, provide:
 5. A list of assumptions made.
 6. Any schema limitations or inconsistencies discovered.
 
-If a disposable local PostgreSQL test database is available, run `schema.sql` followed by `seed.sql`, verify the row counts and constraints, and report the actual execution results.
+If a disposable local PostgreSQL test database is available, run the migrations, verify the row counts and constraints, and report the actual execution results.
 
 If PostgreSQL is unavailable, clearly state that execution has not been performed. We can verify the scripts later.
 
