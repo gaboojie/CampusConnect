@@ -19,6 +19,7 @@
     "migrate": "tsx db/scripts/migrate.ts --environment dev",
     "migrate:dev": "tsx db/scripts/migrate.ts --environment dev",
     "migrate:prod": "tsx db/scripts/migrate.ts --environment prod",
+    "role": "tsx db/scripts/role.ts",
     "db:reset": "tsx db/scripts/reset-database.ts"
   },
   "devDependencies": {

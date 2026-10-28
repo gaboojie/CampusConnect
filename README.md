@@ -154,6 +154,13 @@ To reset production, run the command below, then type `RESET PROD` when prompted
 npm run db:reset -- --environment prod
 ```
 
+To change a user's role, provide exactly one username or email, the requested role, and the target environment. `user` maps to the database's `student` role. The command loads the connection string from the selected `.env.dev` or `.env.prod` file:
+
+```sh
+npm run role -- --username maya_r --role admin --env dev
+npm run role -- --email maya.r@example.com --role user --env prod
+```
+
 ## Project structure
 
 ```text
