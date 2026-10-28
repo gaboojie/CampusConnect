@@ -77,6 +77,7 @@ async function confirmReset(environment: DatabaseEnvironment): Promise<boolean> 
   try {
     console.error(`WARNING: this will drop every table in the public schema of the ${environment} database.`);
     console.error("All application data and schema_migrations will be removed.");
+    console.error("R2 buckets and their images will not be modified.");
     const answer = await readline.question(
       `Type ${confirmationText} to continue: `,
     );

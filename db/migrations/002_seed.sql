@@ -34,18 +34,18 @@
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- ImageMetadata (synthetic metadata; no claim that these R2 objects exist)
+-- ImageMetadata (metadata matches db/reference/seed_images; R2 objects are uploaded separately)
 -- -----------------------------------------------------------------------------
 INSERT INTO "ImageMetadata" (image_id, object_key, content_type, size, width, height, alt_text, status, uploaded_at, filename) VALUES
-    (1, 'resources/4/newman-group-study-4.jpg', 'image/jpeg', 412388, 1600, 1067, 'Group study room with a table, chairs, and a wall display', 'ready', '2026-08-14 10:05:00', 'newman_study_room_4.jpg'),
-    (2, 'resources/10/mccomas-court-1.jpg', 'image/jpeg', 538904, 1920, 1080, 'Indoor basketball court with hardwood floor', 'ready', '2026-08-14 10:20:00', 'mccomas_court1.jpg'),
-    (3, 'resources/12/mccomas-lap-lane-1.jpg', 'image/jpeg', 466120, 1920, 1080, 'Lap lane in an indoor pool', 'ready', '2026-08-14 10:30:00', 'pool_lane1.jpg'),
-    (4, 'resources/14/war-memorial-racquetball-1.jpg', 'image/webp', 201776, 1600, 900, 'Enclosed racquetball court', 'ready', '2026-08-14 11:00:00', 'racquetball_court_1.webp'),
-    (5, 'resources/20/war-memorial-yoga-studio.jpg', 'image/jpeg', 389450, 1600, 1067, 'Yoga studio with mats laid out', 'ready', '2026-08-14 11:10:00', 'yoga_studio.jpg'),
-    (6, 'resources/21/squires-meeting-room-a.jpg', 'image/jpeg', 357002, 1600, 1067, NULL, 'ready', '2026-08-14 14:30:00', 'squires_mtg_a.jpg'),
-    (7, 'users/6/avatar.png', 'image/png', 88311, 512, 512, 'Profile photo', 'ready', '2026-08-24 10:30:00', 'me.png'),
-    (8, 'users/8/avatar.jpg', 'image/jpeg', 64870, 400, 400, NULL, 'ready', '2026-08-20 11:20:00', 'IMG_4471.jpg'),
-    (9, 'users/12/avatar.jpg', 'image/jpeg', 71245, 400, 400, 'Profile photo', 'ready', '2026-08-24 14:00:00', 'profile.jpg');
+    (1, 'resources/4/newman-group-study-4.jpg', 'image/jpeg', 116020, 900, 678, 'Group study room with a table, chairs, and a wall display', 'ready', '2026-08-14 10:05:00', 'newman-group-study-4.jpg'),
+    (2, 'resources/10/mccomas-court-1.jpeg', 'image/jpeg', 41612, 678, 452, 'Indoor basketball court with hardwood floor', 'ready', '2026-08-14 10:20:00', 'mccomas-court-1.jpeg'),
+    (3, 'resources/12/mccomas-lap-lane-1.jpg', 'image/jpeg', 160983, 1024, 768, 'Lap lane in an indoor pool', 'ready', '2026-08-14 10:30:00', 'mccomas-lap-lane-1.jpg'),
+    (4, 'resources/14/war-memorial-racquetball-1.jpeg', 'image/jpeg', 10492, 547, 365, 'Enclosed racquetball court', 'ready', '2026-08-14 11:00:00', 'war-memorial-racquetball-1.jpeg'),
+    (5, 'resources/20/war-memorial-yoga-studio.jpeg', 'image/jpeg', 4971, 299, 168, 'Yoga studio with mats laid out', 'ready', '2026-08-14 11:10:00', 'war-memorial-yoga-studio.jpeg'),
+    (6, 'resources/21/squires-meeting-room-a.jpeg', 'image/jpeg', 32923, 638, 480, NULL, 'ready', '2026-08-14 14:30:00', 'squires-meeting-room-a.jpeg'),
+    (7, 'users/6/avatar-1.jpeg', 'image/jpeg', 6328, 500, 500, 'Profile photo', 'ready', '2026-08-24 10:30:00', 'avatar-1.jpeg'),
+    (8, 'users/8/avatar-2.jpeg', 'image/jpeg', 16396, 425, 470, NULL, 'ready', '2026-08-20 11:20:00', 'avatar-2.jpeg'),
+    (9, 'users/12/avatar-3.png', 'image/png', 9496, 300, 300, 'Profile photo', 'ready', '2026-08-24 14:00:00', 'avatar-3.png');
 
 -- -----------------------------------------------------------------------------
 -- User (fictional accounts; example.com addresses; 555-01xx fictional phone numbers)

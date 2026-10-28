@@ -111,6 +111,7 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
   ```
 
 - `scripts/reset-database.ts` can drop all tables in the selected database after an exact confirmation prompt. Use it only for an intentional reset.
+- Database reset is PostgreSQL-only and never deletes or modifies objects in either Cloudflare R2 bucket. R2 images are deleted only through the authenticated listing-management flow after ownership is verified.
 - Both dev and prod database commands use `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` from the selected environment file. For production, verify the Neon `main` connection string in `.env.prod` before running the command:
 
   ```sh
