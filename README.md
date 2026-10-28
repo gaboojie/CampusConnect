@@ -155,12 +155,16 @@ To reset production, run the command below, then type `RESET PROD` when prompted
 npm run db:reset -- --environment prod
 ```
 
-To change a user's role, provide exactly one username or email, the requested role, and the target environment. `user` maps to the database's `student` role. The command loads the connection string from the selected `.env.dev` or `.env.prod` file:
+To administer a user, provide exactly one username, one action, and the target environment. The command loads the connection string from the selected `.env.dev` or `.env.prod` file:
 
 ```sh
-npm run role -- --username maya_r --role admin --env dev
-npm run role -- --email maya.r@example.com --role user --env prod
+npm run admin:command -- --user maya_r --ban true --env dev
+npm run admin:command -- --user maya_r --delete --env dev
+npm run admin:command -- --user maya_r --can_add_resources false --env dev
+npm run admin:command -- --user maya_r --role admin --env prod
 ```
+
+The command accepts exactly one action: `--ban true|false`, `--delete`, `--can_add_resources true|false`, or `--role admin|user`. The `user` role maps to the database's `student` role. Use `--help` to print the full usage text. Deletion permanently removes the user and dependent database rows, including credit transactions; SQL cannot remove corresponding R2 image objects.
 
 ## Project structure
 

@@ -59,6 +59,7 @@ CREATE TABLE "User" (
     credit_balance          integer       NOT NULL,
     credit_last_reset       date          NOT NULL,
     is_banned               boolean       NOT NULL,
+    is_account_deleted      boolean       NOT NULL DEFAULT FALSE,
     can_add_resources       boolean       NOT NULL DEFAULT TRUE,
     email_notifications_on  boolean       NOT NULL,
     text_notifications_on   boolean       NOT NULL,

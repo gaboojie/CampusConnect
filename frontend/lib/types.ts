@@ -10,6 +10,8 @@ export type PublicUser = {
   emailNotificationsOn: boolean
   textNotificationsOn: boolean
   canAddResources: boolean
+  isBanned: boolean
+  profileImageUrl: string | null
 }
 
 // Timestamps from the resource and announcement APIs are campus wall-clock time

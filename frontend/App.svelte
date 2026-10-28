@@ -243,6 +243,16 @@
     }
   }
 
+  function handleUserUpdated(updatedUser: PublicUser) {
+    user = updatedUser
+  }
+
+  function handleAccountDeleted() {
+    user = null
+    clearAppRouteHash()
+    message = 'Your account has been deleted.'
+  }
+
   onMount(() => {
     verificationToken = readVerificationToken()
     return loadCurrentUser()
@@ -289,7 +299,7 @@
       {#if onAdminPath}
         <AdminLayout {user} />
       {:else}
-        <AppLayout {user} {submitting} onLogout={logout} />
+        <AppLayout {user} {submitting} onLogout={logout} onAccountDeleted={handleAccountDeleted} onUserUpdated={handleUserUpdated} />
       {/if}
     {:else if verificationToken}
       <section class="panel verification-card">
@@ -401,12 +411,14 @@
         <fieldset class="notification-options">
           <legend>Notifications</legend>
           <p class="checkbox-help">Choose how you would like to hear about reservations and important account updates.</p>
-          <label class="checkbox-label">
-            <input type="checkbox" bind:checked={signupEmailNotifications} />
+          <label class="toggle-label">
+            <input class="toggle-input" type="checkbox" bind:checked={signupEmailNotifications} />
+            <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
             <span>Email notifications</span>
           </label>
-          <label class="checkbox-label">
-            <input type="checkbox" bind:checked={signupTextNotifications} disabled={!signupPhoneNumber.trim()} />
+          <label class="toggle-label">
+            <input class="toggle-input" type="checkbox" bind:checked={signupTextNotifications} disabled={!signupPhoneNumber.trim()} />
+            <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
             <span>SMS notifications <span class="optional">requires a phone number</span></span>
           </label>
         </fieldset>

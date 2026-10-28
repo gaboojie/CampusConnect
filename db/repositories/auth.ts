@@ -1,6 +1,23 @@
 import type { DatabaseClient } from "../client";
 import type { DatabaseUserRow } from "../../backend/auth";
 
+const AUTH_USER_COLUMNS = `
+  u.user_id,
+  u.username,
+  u.email,
+  u.phone_number,
+  u.role,
+  u.created_at,
+  u.credit_balance,
+  u.credit_last_reset,
+  u.email_notifications_on,
+  u.text_notifications_on,
+  u.can_add_resources,
+  u.is_banned,
+  u.is_account_deleted,
+  u.profile_image_id
+`;
+
 export async function healthCheck(client: DatabaseClient): Promise<void> {
   await client.query("SELECT 1");
 }
@@ -12,23 +29,12 @@ export async function findAuthenticatedUser(
   const result = await client.query<DatabaseUserRow>(
     `
       SELECT
-        u.user_id,
-        u.username,
-        u.email,
-        u.phone_number,
-        u.role,
-        u.created_at,
-        u.credit_balance,
-        u.credit_last_reset,
-        u.email_notifications_on,
-        u.text_notifications_on,
-        u.can_add_resources,
-        u.is_banned
+        ${AUTH_USER_COLUMNS}
       FROM "Session" AS s
       JOIN "User" AS u ON u.user_id = s.user_id
       WHERE s.token_hash = $1::bytea
         AND s.expires_at > CURRENT_TIMESTAMP
-        AND u.is_banned = FALSE
+        AND u.is_account_deleted = FALSE
       LIMIT 1
     `,
     [tokenHash],
@@ -83,7 +89,10 @@ export async function createSignupRecord(
           email_notifications_on,
           text_notifications_on,
           can_add_resources,
-          email_verified_at
+          email_verified_at,
+          is_banned,
+          is_account_deleted,
+          profile_image_id
       `,
       [
         input.username,
@@ -182,7 +191,7 @@ export async function createVerificationTokenRecord(
   try {
     const userResult = await client.query<DatabaseUserRow>(
       `
-        SELECT user_id, email, email_verified_at, is_banned
+        SELECT user_id, email, email_verified_at, is_banned, is_account_deleted
         FROM "User"
         WHERE LOWER(email) = LOWER($1)
         LIMIT 1
@@ -191,7 +200,7 @@ export async function createVerificationTokenRecord(
     );
     const user = userResult.rows[0];
 
-    if (!user || user.email_verified_at || user.is_banned) {
+    if (!user || user.email_verified_at || user.is_banned || user.is_account_deleted) {
       await client.query("COMMIT");
       return null;
     }
@@ -227,20 +236,9 @@ export async function findLoginUser(
   const result = await client.query<DatabaseUserRow>(
     `
       SELECT
-        user_id,
-        username,
-        email,
-        phone_number,
-        role,
-        created_at,
-        credit_balance,
-        credit_last_reset,
-        email_notifications_on,
-        text_notifications_on,
-        can_add_resources,
+        ${AUTH_USER_COLUMNS.replaceAll("u.", "")},
         email_verified_at,
-        password_hash,
-        is_banned
+        password_hash
       FROM "User"
       WHERE LOWER(email) = LOWER($1) OR username = $1
       LIMIT 1
@@ -249,6 +247,198 @@ export async function findLoginUser(
   );
 
   return result.rows[0] ?? null;
+}
+
+export async function updateUsername(
+  client: DatabaseClient,
+  userId: number,
+  username: string,
+): Promise<void> {
+  await client.query(
+    `UPDATE "User" SET username = $1 WHERE user_id = $2 AND is_account_deleted = FALSE`,
+    [username, userId],
+  );
+}
+
+export async function updateNotificationSettings(
+  client: DatabaseClient,
+  userId: number,
+  emailNotificationsOn: boolean,
+  textNotificationsOn: boolean,
+): Promise<void> {
+  await client.query(
+    `
+      UPDATE "User"
+      SET email_notifications_on = $1,
+          text_notifications_on = $2
+      WHERE user_id = $3 AND is_account_deleted = FALSE
+    `,
+    [emailNotificationsOn, textNotificationsOn, userId],
+  );
+}
+
+export type ProfileImageUpdateResult =
+  | { ok: true; oldObjectKey: string | null }
+  | { ok: false; status: 400 | 503; error: string };
+
+function profileImageKey(userId: number, file: File): string {
+  const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  return `users/${userId}/profile-${crypto.randomUUID()}.${extension}`;
+}
+
+export async function updateProfileImage(
+  client: DatabaseClient,
+  bucket: R2Bucket | undefined,
+  userId: number,
+  file: File | null,
+  removeImage: boolean,
+): Promise<ProfileImageUpdateResult> {
+  if (!file && !removeImage) {
+    return { ok: false, status: 400, error: "Choose a profile image or remove the current image." };
+  }
+  if (file && !bucket) {
+    return { ok: false, status: 503, error: "Image storage is not configured right now." };
+  }
+
+  let uploadedKey: string | null = null;
+  let committed = false;
+  let oldObjectKey: string | null = null;
+
+  await client.query("BEGIN");
+  try {
+    const current = await client.query<{ image_id: number | null; object_key: string | null }>(
+      `
+        SELECT u.profile_image_id AS image_id, img.object_key
+        FROM "User" AS u
+        LEFT JOIN "ImageMetadata" AS img ON img.image_id = u.profile_image_id
+        WHERE u.user_id = $1 AND u.is_account_deleted = FALSE
+        FOR UPDATE OF u
+      `,
+      [userId],
+    );
+    const currentImage = current.rows[0];
+    if (!currentImage) {
+      await client.query("ROLLBACK");
+      return { ok: false, status: 400, error: "That account is no longer available." };
+    }
+    oldObjectKey = currentImage.object_key;
+
+    if (file) {
+      uploadedKey = profileImageKey(userId, file);
+      await bucket!.put(uploadedKey, await file.arrayBuffer(), {
+        httpMetadata: { contentType: file.type },
+        customMetadata: { filename: file.name },
+      });
+      const inserted = await client.query<{ image_id: number }>(
+        `
+          INSERT INTO "ImageMetadata" (object_key, content_type, size, width, height, alt_text, status, filename)
+          VALUES ($1, $2, $3, 0, 0, 'Profile photo', 'ready', $4)
+          RETURNING image_id
+        `,
+        [uploadedKey, file.type, file.size, file.name],
+      );
+      await client.query(
+        `UPDATE "User" SET profile_image_id = $1 WHERE user_id = $2`,
+        [inserted.rows[0].image_id, userId],
+      );
+      if (currentImage.image_id !== null) {
+        await client.query(`DELETE FROM "ImageMetadata" WHERE image_id = $1`, [currentImage.image_id]);
+      }
+    } else {
+      await client.query(`UPDATE "User" SET profile_image_id = NULL WHERE user_id = $1`, [userId]);
+      if (currentImage.image_id !== null) {
+        await client.query(`DELETE FROM "ImageMetadata" WHERE image_id = $1`, [currentImage.image_id]);
+      }
+    }
+
+    await client.query("COMMIT");
+    committed = true;
+    if (oldObjectKey && bucket) {
+      try {
+        await bucket.delete(oldObjectKey);
+      } catch (error) {
+        console.error(`Profile image cleanup failed for ${oldObjectKey}:`, error);
+      }
+    }
+    return { ok: true, oldObjectKey };
+  } catch {
+    if (!committed) await client.query("ROLLBACK");
+    if (uploadedKey && bucket) {
+      try {
+        await bucket.delete(uploadedKey);
+      } catch (error) {
+        console.error(`Profile image cleanup failed for ${uploadedKey}:`, error);
+      }
+    }
+    throw new Error("Unable to update the profile image right now.");
+  }
+}
+
+export async function deleteAccount(
+  client: DatabaseClient,
+  bucket: R2Bucket | undefined,
+  userId: number,
+  username: string,
+): Promise<boolean> {
+  let profileObjectKey: string | null = null;
+  await client.query("BEGIN");
+
+  try {
+    const current = await client.query<{ username: string; profile_image_id: number | null; object_key: string | null }>(
+      `
+        SELECT u.username, u.profile_image_id, img.object_key
+        FROM "User" AS u
+        LEFT JOIN "ImageMetadata" AS img ON img.image_id = u.profile_image_id
+        WHERE u.user_id = $1 AND u.is_account_deleted = FALSE
+        FOR UPDATE OF u
+      `,
+      [userId],
+    );
+    const row = current.rows[0];
+    if (!row || row.username !== username) {
+      await client.query("ROLLBACK");
+      return false;
+    }
+    profileObjectKey = row.object_key;
+
+    await client.query(`DELETE FROM "EmailVerificationToken" WHERE user_id = $1`, [userId]);
+    await client.query(`DELETE FROM "Session" WHERE user_id = $1`, [userId]);
+    await client.query(`DELETE FROM "Notification" WHERE user_id = $1`, [userId]);
+    await client.query(`DELETE FROM "ReservationReview" WHERE reviewer_user_id = $1 OR reviewee_user_id = $1`, [userId]);
+    await client.query(`DELETE FROM "ResourceReview" WHERE reviewer_user_id = $1`, [userId]);
+    if (row.profile_image_id !== null) {
+      await client.query(`DELETE FROM "ImageMetadata" WHERE image_id = $1`, [row.profile_image_id]);
+    }
+    // Keep the unique login identifiers so a later login can explain that the
+    // account was deleted instead of returning a misleading credential error.
+    await client.query(
+      `
+        UPDATE "User"
+        SET password_hash = NULL,
+            email_verified_at = NULL,
+            phone_number = NULL,
+            email_notifications_on = FALSE,
+            text_notifications_on = FALSE,
+            profile_image_id = NULL,
+            is_account_deleted = TRUE
+        WHERE user_id = $1
+      `,
+      [userId],
+    );
+    await client.query("COMMIT");
+
+    if (profileObjectKey && bucket) {
+      try {
+        await bucket.delete(profileObjectKey);
+      } catch (error) {
+        console.error(`Profile image cleanup failed for ${profileObjectKey}:`, error);
+      }
+    }
+    return true;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  }
 }
 
 export async function createSessionRecord(

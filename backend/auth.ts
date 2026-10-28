@@ -19,6 +19,8 @@ export type PublicUser = {
   emailNotificationsOn: boolean;
   textNotificationsOn: boolean;
   canAddResources: boolean;
+  isBanned: boolean;
+  profileImageUrl: string | null;
 };
 
 export type DatabaseUserRow = {
@@ -36,6 +38,8 @@ export type DatabaseUserRow = {
   email_verified_at?: string | Date | null;
   password_hash?: string | null;
   is_banned?: boolean;
+  is_account_deleted?: boolean;
+  profile_image_id?: number | null;
 };
 
 export type SignupInput = {
@@ -301,5 +305,7 @@ export function serializeUser(row: DatabaseUserRow): PublicUser {
     emailNotificationsOn: row.email_notifications_on,
     textNotificationsOn: row.text_notifications_on,
     canAddResources: row.can_add_resources,
+    isBanned: row.is_banned === true,
+    profileImageUrl: row.profile_image_id == null ? null : `/api/profile-images/${row.profile_image_id}`,
   };
 }
