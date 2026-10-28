@@ -2,12 +2,12 @@
 -- CampusConnect: Location-Aware Campus Resource Reservation System
 -- Phase 4 - Physical schema (PostgreSQL)
 --
--- Source of truth: database/phase3_schema.dbml (tables, columns, types,
--- NOT NULL, UNIQUE) and phase3_documentation.pdf (referential actions,
+-- Source of truth: the approved Phase 3 logical schema (tables, columns,
+-- types, NOT NULL, UNIQUE) and phase 3 documentation (referential actions,
 -- general constraints).
 --
 -- Run on a fresh, empty database:
---   psql -v ON_ERROR_STOP=1 -d <test_db> -f database/schema.sql
+--   npm run migrate:dev
 --
 -- Notes
 --   * Table names use quoted PascalCase identifiers so PostgreSQL preserves names such as
@@ -23,8 +23,6 @@
 --   * The whole script runs in one transaction: it either creates every
 --     object or nothing.
 -- =============================================================================
-
-BEGIN;
 
 -- -----------------------------------------------------------------------------
 -- ImageMetadata: Cloudflare R2 object metadata for profile and resource images.
@@ -149,7 +147,7 @@ CREATE TABLE "Resource" (
     CONSTRAINT pk_resource                   PRIMARY KEY (resource_id),
     CONSTRAINT uq_resource_resource_image_id UNIQUE (resource_image_id),
     CONSTRAINT ck_resource_required_credits CHECK (required_credits BETWEEN 1 AND 20),
-    CONSTRAINT ck_resource_capacity CHECK (capacity BETWEEN 1 AND 100),
+    CONSTRAINT ck_resource_capacity         CHECK (capacity BETWEEN 1 AND 100),
 
     -- An owner with listed resources cannot be deleted; reassign or remove
     -- the resources first.
@@ -361,4 +359,3 @@ CREATE TABLE "Session" (
         ON UPDATE CASCADE ON DELETE CASCADE
 );
 
-COMMIT;

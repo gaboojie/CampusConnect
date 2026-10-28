@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { hashSessionToken } from "../worker/auth";
-import type { DatabaseClient, DatabaseQueryResult } from "../worker/db";
-import { createApp } from "../worker/index";
-import { LOCK_RESOURCE_SQL, LOCK_USER_SQL } from "../worker/reservations";
+import { hashSessionToken } from "../backend/auth";
+import type { DatabaseClient, DatabaseQueryResult } from "../db/client";
+import { createApp } from "../backend/index";
+import { LOCK_RESOURCE_SQL, LOCK_USER_SQL } from "../db/repositories/reservations";
 
 // Times are local campus "YYYY-MM-DD HH:MM" strings, which compare correctly as text.
 const NOW = "2026-10-14 12:00";
@@ -37,7 +37,7 @@ const overlaps = (a: { start: string; end: string }, start: string, end: string)
   a.start < end && a.end > start;
 
 // A small in-memory model of the reservation tables. It understands exactly the
-// queries worker/reservations.ts sends, evaluates the slot checks in JavaScript,
+// queries db/repositories/reservations.ts sends, evaluates the slot checks in JavaScript,
 // and implements row locks: FOR UPDATE / FOR NO KEY UPDATE wait until the
 // holding client sends COMMIT or ROLLBACK.
 class FakeReservationDatabase {

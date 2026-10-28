@@ -4,7 +4,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "pg";
 
-const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 type MigrationEnvironment = "dev" | "prod";
 
@@ -28,10 +28,11 @@ function getDatabaseUrl(environment: MigrationEnvironment): string {
     databaseUrlIndex >= 0 ? process.argv[databaseUrlIndex + 1] : undefined;
   const environmentVariable = "CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB";
 
-  // Development migrations use the local Hyperdrive connection string from
-  // .env.dev when it has not already been exported or passed explicitly.
-  if (environment === "dev" && !databaseUrlFromArgs && !process.env[environmentVariable] && existsSync(".env.dev")) {
-    process.loadEnvFile(".env.dev");
+  // Load the selected environment's local Hyperdrive connection string when
+  // it has not already been exported or passed explicitly.
+  const environmentFile = join(projectRoot, `.env.${environment}`);
+  if (!databaseUrlFromArgs && !process.env[environmentVariable] && existsSync(environmentFile)) {
+    process.loadEnvFile(environmentFile);
   }
 
   const databaseUrl = databaseUrlFromArgs ?? process.env[environmentVariable];
@@ -47,7 +48,7 @@ function getDatabaseUrl(environment: MigrationEnvironment): string {
 
 async function main(): Promise<void> {
   const environment = getMigrationEnvironment();
-  const migrationsDirectory = join(projectRoot, "migrations", environment);
+  const migrationsDirectory = join(projectRoot, "db", "migrations");
   const client = new Client({ connectionString: getDatabaseUrl(environment) });
   await client.connect();
 

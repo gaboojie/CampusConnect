@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createApp } from "../worker/index";
+import { createApp } from "../backend/index";
 import {
   createEmailVerificationToken,
   hashEmailVerificationToken,
@@ -11,8 +11,8 @@ import {
   validateChangePasswordInput,
   validateSignupInput,
   verifyPassword,
-} from "../worker/auth";
-import type { DatabaseClient, DatabaseQueryResult } from "../worker/db";
+} from "../backend/auth";
+import type { DatabaseClient, DatabaseQueryResult } from "../db/client";
 
 type FakeSession = {
   userId: number;
@@ -328,7 +328,7 @@ describe("authentication routes", () => {
 
     expect(signup.status).toBe(201);
     expect(signup.headers.get("set-cookie")).toBeNull();
-    expect((await signup.json()).message).toContain("Check your Virginia Tech email");
+    expect((await signup.json() as { message: string }).message).toContain("Check your Virginia Tech email");
     expect(sentEmails).toHaveLength(1);
     expect(database.users[0].email_verified_at).toBeNull();
     expect(database.verificationTokens[0].tokenHash).not.toBe(sentEmails[0].token);
@@ -411,7 +411,7 @@ describe("authentication routes", () => {
       environment,
     );
     expect(me.status).toBe(200);
-    expect((await me.json()).user.username).toBe("maya_r");
+    expect((await me.json() as { user: { username: string } }).user.username).toBe("maya_r");
 
     const invalidLogin = await app.request(
       "http://localhost/api/auth/login",
@@ -587,6 +587,7 @@ describe("authentication routes", () => {
       credit_last_reset: new Date(),
       email_notifications_on: true,
       text_notifications_on: false,
+      can_add_resources: false,
         email_verified_at: null,
       is_banned: true,
     });

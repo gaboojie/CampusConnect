@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import app from "../worker/index";
+import app from "../backend/index";
 
 describe("Worker health check", () => {
   it("reports an unconfigured database instead of crashing", async () => {

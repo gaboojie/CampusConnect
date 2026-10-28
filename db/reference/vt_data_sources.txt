@@ -1,7 +1,7 @@
 CampusConnect - Phase 4 Seed Data: Sources, Assumptions, and AI Use
 ====================================================================
 
-Files covered : database/seed.sql (loaded after database/schema.sql)
+Files covered : db/migrations/002_seed.sql (loaded after db/migrations/001_schema.sql)
 Snapshot date : 2026-10-11 12:00 (America/New_York local time)
 Sources accessed: 2026-10-11
 

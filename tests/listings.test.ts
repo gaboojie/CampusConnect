@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseListingInput } from "../worker/listings";
-import { createApp } from "../worker/index";
+import { parseListingInput } from "../db/repositories/listings";
+import { createApp } from "../backend/index";
 import { FakeReadDatabase, authHeaders } from "./support/fakeReadDatabase";
 
 const validBody = {

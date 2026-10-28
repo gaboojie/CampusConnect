@@ -1,4 +1,4 @@
-import type { DatabaseClient } from "./db";
+import type { DatabaseClient } from "../client";
 import { CAMPUS_NOW_SQL, MAX_PAGE_SIZE, localTimestampSql, type Validation } from "./resources";
 
 export const ANNOUNCEMENT_TYPES = ["maintenance", "new"] as const;

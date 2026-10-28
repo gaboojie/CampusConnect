@@ -1,4 +1,4 @@
-import type { DatabaseClient } from "./db";
+import type { DatabaseClient } from "../client";
 import {
   CAMPUS_NOW_SQL,
   localTimestampSql,

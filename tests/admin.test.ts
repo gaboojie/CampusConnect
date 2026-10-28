@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createApp } from "../worker/index";
-import { parseAdminReservationQuery, parseAdminUserQuery } from "../worker/admin";
+import { createApp } from "../backend/index";
+import { parseAdminReservationQuery, parseAdminUserQuery } from "../db/repositories/admin";
 import { FakeReadDatabase, authHeaders, expectReadOnly } from "./support/fakeReadDatabase";
 
 const userRow = {
