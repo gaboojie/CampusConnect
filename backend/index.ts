@@ -72,6 +72,13 @@ import {
   type Reservation,
   type ServiceResult,
 } from "../db/repositories/reservations";
+import {
+  NotificationWorkflow,
+  repairPendingNotificationWorkflows,
+  startNotificationWorkflows,
+  type NotificationWorkflowBinding,
+} from "./notification-workflow";
+import type { NotificationWorkflowPayload } from "../db/repositories/notifications";
 
 type Bindings = {
   ASSETS: Fetcher;
@@ -81,6 +88,7 @@ type Bindings = {
   PUBLIC_APP_ORIGIN?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
+  NOTIFICATION_WORKFLOW?: Workflow<NotificationWorkflowPayload>;
 };
 
 type AppEnv = {
@@ -93,6 +101,10 @@ type AppEnv = {
 type AppOptions = {
   createDatabaseClient?: DatabaseClientFactory;
   sendVerificationEmail?: VerificationEmailSender;
+  startNotificationWorkflows?: (
+    binding: NotificationWorkflowBinding,
+    notifications: Array<{ notificationId: number; workflowId?: string | null }>,
+  ) => Promise<void>;
 };
 
 type LoginBody = {
@@ -314,6 +326,35 @@ export function createApp(options: AppOptions = {}) {
 
   const getEmailSender = (c: Context<AppEnv>): VerificationEmailSender =>
     options.sendVerificationEmail ?? createDefaultVerificationEmailSender(c);
+  const startWorkflows = options.startNotificationWorkflows ?? startNotificationWorkflows;
+
+  const dispatchNotificationWorkflows = async (
+    c: Context<AppEnv>,
+    notificationIds: number[] | undefined,
+  ): Promise<void> => {
+    if (!c.env.NOTIFICATION_WORKFLOW || !notificationIds?.length) return;
+    try {
+      await startWorkflows(
+        c.env.NOTIFICATION_WORKFLOW,
+        notificationIds.map((notificationId) => ({ notificationId })),
+      );
+    } catch (error) {
+      console.error(`Unable to dispatch notification workflows: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const enqueueNotificationWorkflows = (
+    c: Context<AppEnv>,
+    notificationIds: number[] | undefined,
+  ): void => {
+    if (!c.env.NOTIFICATION_WORKFLOW || !notificationIds?.length) return;
+    const dispatch = dispatchNotificationWorkflows(c, notificationIds);
+    if (typeof c.executionCtx?.waitUntil === "function") {
+      c.executionCtx.waitUntil(dispatch);
+    } else {
+      void dispatch;
+    }
+  };
 
   app.get("/api/health", async (c) => {
     if (!c.env.DB) {
@@ -837,6 +878,7 @@ export function createApp(options: AppOptions = {}) {
         (client) => createListing(client, c.env.RESOURCE_IMAGES, user.userId, parsed.value),
       );
       if (!result.ok) return c.json({ error: result.error }, result.status);
+      enqueueNotificationWorkflows(c, result.notificationIds);
       return c.json({ listing: result.value }, 201);
     } catch {
       return c.json({ error: "Unable to create the listing right now." }, 503);
@@ -857,6 +899,7 @@ export function createApp(options: AppOptions = {}) {
         (client) => updateListing(client, c.env.RESOURCE_IMAGES, c.get("user").userId, resourceId, parsed.value),
       );
       if (!result.ok) return c.json({ error: result.error }, result.status);
+      enqueueNotificationWorkflows(c, result.notificationIds);
       return c.json({ listing: result.value });
     } catch {
       return c.json({ error: "Unable to update the listing right now." }, 503);
@@ -875,6 +918,7 @@ export function createApp(options: AppOptions = {}) {
         (client) => deleteListing(client, c.env.RESOURCE_IMAGES, c.get("user").userId, resourceId),
       );
       if (!result.ok) return c.json({ error: result.error }, result.status);
+      enqueueNotificationWorkflows(c, result.notificationIds);
       return c.body(null, 204);
     } catch {
       return c.json({ error: "Unable to delete the listing right now." }, 503);
@@ -944,6 +988,7 @@ export function createApp(options: AppOptions = {}) {
       if (!result.ok) {
         return c.json({ error: result.error }, result.status);
       }
+      enqueueNotificationWorkflows(c, result.notificationIds);
       return c.json({ reservation: result.value }, successStatus);
     } catch {
       return c.json({ error: "Unable to save the reservation right now." }, 503);
@@ -1112,6 +1157,18 @@ export function createApp(options: AppOptions = {}) {
   return app;
 }
 
+async function scheduled(controller: ScheduledController, env: Bindings): Promise<void> {
+  if (controller.cron !== "*/15 * * * *") return;
+
+  try {
+    await repairPendingNotificationWorkflows(env, env.NOTIFICATION_WORKFLOW);
+  } catch (error) {
+    console.error(`Notification repair sweep failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw error;
+  }
+}
+
 const app = createApp();
 
-export default app;
+export { NotificationWorkflow };
+export default Object.assign(app, { scheduled });

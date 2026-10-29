@@ -440,7 +440,38 @@ INSERT INTO "CreditTransaction" (transaction_id, user_id, amount, transaction_ty
 -- -----------------------------------------------------------------------------
 -- Notification
 -- -----------------------------------------------------------------------------
-INSERT INTO "Notification" (notification_id, user_id, message, notification_type, created_at) VALUES
+INSERT INTO "Notification" (
+    notification_id,
+    user_id,
+    reservation_id,
+    message,
+    notification_type,
+    created_at,
+    scheduled_for,
+    email_status,
+    email_workflow_id,
+    email_sent_at,
+    email_error
+)
+SELECT
+    notification_id,
+    user_id,
+    CASE notification_id
+        WHEN 45 THEN 10
+        WHEN 47 THEN 3
+        WHEN 59 THEN 31
+        WHEN 102 THEN 47
+        ELSE NULL
+    END AS reservation_id,
+    message,
+    notification_type,
+    created_at::timestamp,
+    created_at::timestamp AS scheduled_for,
+    'sent' AS email_status,
+    'seed-notification-' || notification_id AS email_workflow_id,
+    created_at::timestamp AS email_sent_at,
+    NULL::text AS email_error
+FROM (VALUES
     (1, 1, 'Welcome to CampusConnect! 20 credits have been added to your account.', 'account', '2026-08-10 09:00:00'),
     (2, 2, 'Welcome to CampusConnect! 20 credits have been added to your account.', 'account', '2026-08-10 10:30:00'),
     (3, 3, 'Welcome to CampusConnect! 20 credits have been added to your account.', 'account', '2026-08-11 09:15:00'),
@@ -549,7 +580,8 @@ INSERT INTO "Notification" (notification_id, user_id, message, notification_type
     (106, 18, 'Your reservation for McComas Pool Lap Lane 1 on Tue Oct 13, 7:00 AM-8:00 AM is confirmed. 1 credit deducted.', 'reservation_confirmed', '2026-10-09 21:15:00'),
     (107, 17, 'Your reservation for War Memorial Table Tennis Table 2 on Sun Oct 11, 4:00 PM-5:00 PM is confirmed. 1 credit deducted.', 'reservation_confirmed', '2026-10-10 19:15:00'),
     (108, 11, 'Your reservation for McComas Basketball/Volleyball Court 1 on Sat Oct 17, 6:00 PM-8:00 PM is confirmed. 4 credits deducted.', 'reservation_confirmed', '2026-10-10 20:00:00'),
-    (109, 8, 'Your reservation for Newman Group Study Room 5 on Thu Oct 15, 1:00 PM-3:00 PM is confirmed. 2 credits deducted.', 'reservation_confirmed', '2026-10-10 21:30:00');
+    (109, 8, 'Your reservation for Newman Group Study Room 5 on Thu Oct 15, 1:00 PM-3:00 PM is confirmed. 2 credits deducted.', 'reservation_confirmed', '2026-10-10 21:30:00')
+) AS seed(notification_id, user_id, message, notification_type, created_at);
 
 -- -----------------------------------------------------------------------------
 -- ReservationReview: the reserving student reviews the resource owner.
