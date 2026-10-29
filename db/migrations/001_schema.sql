@@ -39,7 +39,6 @@ CREATE TABLE "ImageMetadata" (
     status        varchar      NOT NULL,
     uploaded_at   timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     filename      varchar      NOT NULL,
-
     CONSTRAINT pk_imagemetadata            PRIMARY KEY (image_id),
     CONSTRAINT uq_imagemetadata_object_key UNIQUE (object_key)
 );
@@ -53,7 +52,6 @@ CREATE TABLE "User" (
     email                   varchar(254)  NOT NULL,
     password_hash           text,
     email_verified_at       timestamp,
-    phone_number            varchar(16),
     role                    varchar       NOT NULL DEFAULT 'student',
     created_at              timestamp     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     credit_balance          integer       NOT NULL,
@@ -62,13 +60,11 @@ CREATE TABLE "User" (
     is_account_deleted      boolean       NOT NULL DEFAULT FALSE,
     can_add_resources       boolean       NOT NULL DEFAULT TRUE,
     email_notifications_on  boolean       NOT NULL,
-    text_notifications_on   boolean       NOT NULL,
     profile_image_id        integer,
 
     CONSTRAINT pk_user                  PRIMARY KEY (user_id),
     CONSTRAINT uq_user_username         UNIQUE (username),
     CONSTRAINT uq_user_email            UNIQUE (email),
-    CONSTRAINT uq_user_phone_number     UNIQUE (phone_number),
     CONSTRAINT uq_user_profile_image_id UNIQUE (profile_image_id),
 
     -- Optional 1:0..1 image; the user stays if the image is deleted.

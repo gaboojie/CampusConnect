@@ -415,9 +415,7 @@ export function createApp(options: AppOptions = {}) {
             username: validation.value.username,
             email: validation.value.email,
             passwordHash,
-            phoneNumber: validation.value.phoneNumber,
             emailNotificationsOn: validation.value.emailNotificationsOn,
-            textNotificationsOn: validation.value.textNotificationsOn,
             verificationTokenHash,
           }),
       );
@@ -651,11 +649,8 @@ export function createApp(options: AppOptions = {}) {
   app.patch("/api/profile/notifications", async (c) => {
     const body = await readJson(c);
     const values = body && typeof body === "object" ? body as Record<string, unknown> : {};
-    if (typeof values.emailNotificationsOn !== "boolean" || typeof values.textNotificationsOn !== "boolean") {
-      return c.json({ error: "Choose whether email and SMS notifications are on or off." }, 400);
-    }
-    if (values.textNotificationsOn && !c.get("user").phoneNumber) {
-      return c.json({ error: "Add a phone number before enabling SMS notifications." }, 400);
+    if (typeof values.emailNotificationsOn !== "boolean") {
+      return c.json({ error: "Choose whether email notifications are on or off." }, 400);
     }
     if (!c.env.DB) return databaseUnavailable(c);
 
@@ -665,7 +660,6 @@ export function createApp(options: AppOptions = {}) {
           client,
           c.get("user").userId,
           values.emailNotificationsOn as boolean,
-          values.textNotificationsOn as boolean,
         );
         return findAuthenticatedUser(client, await currentSessionHash(c));
       });

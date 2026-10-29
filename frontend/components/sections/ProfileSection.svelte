@@ -8,7 +8,7 @@
   export let onAccountDeleted: () => void
   export let onUserUpdated: (user: PublicUser) => void
 
-  type EditableField = 'username' | 'profileImage' | 'emailNotifications' | 'textNotifications' | 'password' | null
+  type EditableField = 'username' | 'profileImage' | 'emailNotifications' | 'password' | null
 
   let editing: EditableField = null
   let saving = false
@@ -18,7 +18,6 @@
 
   let usernameDraft = ''
   let emailNotificationsDraft = false
-  let textNotificationsDraft = false
   let selectedImage: File | null = null
   let imageInput: HTMLInputElement
 
@@ -42,7 +41,6 @@
     editing = field
     if (field === 'username') usernameDraft = user.username
     if (field === 'emailNotifications') emailNotificationsDraft = user.emailNotificationsOn
-    if (field === 'textNotifications') textNotificationsDraft = user.textNotificationsOn
     if (field === 'profileImage') selectedImage = null
     if (field === 'password') {
       currentPassword = ''
@@ -85,7 +83,6 @@
     try {
       const payload = await sendJson<{ user: PublicUser; message: string }>('PATCH', '/api/profile/notifications', {
         emailNotificationsOn: emailNotificationsDraft,
-        textNotificationsOn: textNotificationsDraft,
       })
       applyUpdatedUser(payload.user, payload.message)
     } catch (caught) {
@@ -223,12 +220,10 @@
   <dl class="profile-details">
     <div class="profile-detail-row"><dt>Username</dt>{#if editing === 'username'}<dd class="profile-edit-value"><input bind:value={usernameDraft} minlength="3" maxlength="32" autocomplete="username" /><span class="profile-edit-actions"><button type="button" class="compact-button" on:click={saveUsername} disabled={saving}>Save</button><button type="button" class="secondary-button compact-button" on:click={cancelEditing} disabled={saving}>Cancel</button></span></dd>{:else}<dd>{user.username}</dd>{/if}{#if (!user.isBanned || user.role === 'admin') && editing !== 'username'}<button type="button" class="icon-button detail-edit" aria-label="Edit username" title="Edit username" on:click={() => startEditing('username')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16.5-.75 3.75L7 19.5 18.25 8.25a2.12 2.12 0 0 0-3-3L4 16.5Z" /><path d="m13.75 6.75 3.5 3.5" /></svg></button>{/if}</div>
     <div><dt>Email</dt><dd>{user.email}</dd></div>
-    <div><dt>Phone</dt><dd>{user.phoneNumber ?? 'Not provided'}</dd></div>
     <div><dt>Account type</dt><dd>{accountTypeLabel(user.role)}</dd></div>
     <div><dt>Credits</dt><dd>{user.creditBalance}</dd></div>
     <div><dt>Joined</dt><dd>{new Date(user.createdAt).toLocaleDateString()}</dd></div>
     <div class="profile-detail-row"><dt>Email notifications</dt>{#if editing === 'emailNotifications'}<dd class="profile-edit-value"><label class="toggle-label"><input class="toggle-input" type="checkbox" bind:checked={emailNotificationsDraft} /><span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span><span>Receive email notifications</span></label><span class="profile-edit-actions"><button type="button" class="compact-button" on:click={saveNotifications} disabled={saving}>Save</button><button type="button" class="secondary-button compact-button" on:click={cancelEditing} disabled={saving}>Cancel</button></span></dd>{:else}<dd>{user.emailNotificationsOn ? 'On' : 'Off'}</dd>{/if}{#if (!user.isBanned || user.role === 'admin') && editing !== 'emailNotifications'}<button type="button" class="icon-button detail-edit" aria-label="Edit email notifications" title="Edit email notifications" on:click={() => startEditing('emailNotifications')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16.5-.75 3.75L7 19.5 18.25 8.25a2.12 2.12 0 0 0-3-3L4 16.5Z" /><path d="m13.75 6.75 3.5 3.5" /></svg></button>{/if}</div>
-    <div class="profile-detail-row"><dt>SMS notifications</dt>{#if editing === 'textNotifications'}<dd class="profile-edit-value"><label class="toggle-label"><input class="toggle-input" type="checkbox" bind:checked={textNotificationsDraft} disabled={!user.phoneNumber} /><span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span><span>Receive SMS notifications</span></label>{#if !user.phoneNumber}<span class="form-help">Add a phone number before enabling SMS notifications.</span>{/if}<span class="profile-edit-actions"><button type="button" class="compact-button" on:click={saveNotifications} disabled={saving}>Save</button><button type="button" class="secondary-button compact-button" on:click={cancelEditing} disabled={saving}>Cancel</button></span></dd>{:else}<dd>{user.textNotificationsOn ? 'On' : 'Off'}</dd>{/if}{#if (!user.isBanned || user.role === 'admin') && editing !== 'textNotifications'}<button type="button" class="icon-button detail-edit" aria-label="Edit SMS notifications" title="Edit SMS notifications" on:click={() => startEditing('textNotifications')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16.5-.75 3.75L7 19.5 18.25 8.25a2.12 2.12 0 0 0-3-3L4 16.5Z" /><path d="m13.75 6.75 3.5 3.5" /></svg></button>{/if}</div>
   </dl>
 
   {#if !user.isBanned || user.role === 'admin'}

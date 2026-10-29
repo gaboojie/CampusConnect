@@ -109,7 +109,7 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Username</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Credits</th><th>Joined</th>
+              <th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Credits</th><th>Joined</th>
             </tr>
           </thead>
           <tbody>
@@ -117,7 +117,6 @@
               <tr>
                 <td><a href={`${adminHash('users')}/${user.userId}`}>{user.username}</a></td>
                 <td>{user.email}</td>
-                <td>{user.phoneNumber ?? '—'}</td>
                 <td><span class="badge">{user.role}</span></td>
                 <td><span class={`badge user-status-${user.status}`}>{user.status}</span></td>
                 <td>{user.creditBalance}</td>

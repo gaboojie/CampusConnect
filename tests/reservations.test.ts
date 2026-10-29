@@ -148,13 +148,11 @@ class FakeReservationDatabase {
               user_id: userId,
               username: `user${userId}`,
               email: `user${userId}@vt.edu`,
-              phone_number: null,
               role: "student",
               created_at: new Date("2026-08-24T10:00:00Z"),
               credit_balance: 20,
               credit_last_reset: new Date("2026-10-01T00:00:00Z"),
               email_notifications_on: true,
-              text_notifications_on: false,
               is_banned: false,
             }];
       }

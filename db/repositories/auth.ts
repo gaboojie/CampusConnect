@@ -5,13 +5,11 @@ const AUTH_USER_COLUMNS = `
   u.user_id,
   u.username,
   u.email,
-  u.phone_number,
   u.role,
   u.created_at,
   u.credit_balance,
   u.credit_last_reset,
   u.email_notifications_on,
-  u.text_notifications_on,
   u.can_add_resources,
   u.is_banned,
   u.is_account_deleted,
@@ -47,9 +45,7 @@ export type SignupRecordInput = {
   username: string;
   email: string;
   passwordHash: string;
-  phoneNumber: string | null;
   emailNotificationsOn: boolean;
-  textNotificationsOn: boolean;
   verificationTokenHash: string;
 };
 
@@ -66,28 +62,24 @@ export async function createSignupRecord(
           username,
           email,
           password_hash,
-          phone_number,
           role,
           credit_balance,
           credit_last_reset,
           is_banned,
           can_add_resources,
           email_notifications_on,
-          text_notifications_on,
           email_verified_at
         )
-        VALUES ($1, $2, $3, $4, 'student', 20, CURRENT_DATE, FALSE, TRUE, $5, $6, NULL)
+        VALUES ($1, $2, $3, 'student', 20, CURRENT_DATE, FALSE, TRUE, $4, NULL)
         RETURNING
           user_id,
           username,
           email,
-          phone_number,
           role,
           created_at,
           credit_balance,
           credit_last_reset,
           email_notifications_on,
-          text_notifications_on,
           can_add_resources,
           email_verified_at,
           is_banned,
@@ -98,9 +90,7 @@ export async function createSignupRecord(
         input.username,
         input.email,
         input.passwordHash,
-        input.phoneNumber,
         input.emailNotificationsOn,
-        input.textNotificationsOn,
       ],
     );
     const user = userResult.rows[0];
@@ -264,16 +254,14 @@ export async function updateNotificationSettings(
   client: DatabaseClient,
   userId: number,
   emailNotificationsOn: boolean,
-  textNotificationsOn: boolean,
 ): Promise<void> {
   await client.query(
     `
       UPDATE "User"
-      SET email_notifications_on = $1,
-          text_notifications_on = $2
-      WHERE user_id = $3 AND is_account_deleted = FALSE
+      SET email_notifications_on = $1
+      WHERE user_id = $2 AND is_account_deleted = FALSE
     `,
-    [emailNotificationsOn, textNotificationsOn, userId],
+    [emailNotificationsOn, userId],
   );
 }
 
@@ -416,9 +404,7 @@ export async function deleteAccount(
         UPDATE "User"
         SET password_hash = NULL,
             email_verified_at = NULL,
-            phone_number = NULL,
             email_notifications_on = FALSE,
-            text_notifications_on = FALSE,
             profile_image_id = NULL,
             is_account_deleted = TRUE
         WHERE user_id = $1

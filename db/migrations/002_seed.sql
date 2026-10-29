@@ -48,48 +48,48 @@ INSERT INTO "ImageMetadata" (image_id, object_key, content_type, size, width, he
     (9, 'users/12/avatar-3.png', 'image/png', 9496, 300, 300, 'Profile photo', 'ready', '2026-08-24 14:00:00', 'avatar-3.png');
 
 -- -----------------------------------------------------------------------------
--- User (fictional accounts; example.com addresses; 555-01xx fictional phone numbers)
+-- User (fictional accounts; example.com addresses)
 -- credit_balance and credit_last_reset are derived from the credit timeline.
 -- Every seeded account uses the demo-only password CampusConnect123! and is
 -- marked as verified so the sample data can be used to exercise login.
 -- -----------------------------------------------------------------------------
-INSERT INTO "User" (user_id, username, email, password_hash, email_verified_at, phone_number, role, created_at, credit_balance, credit_last_reset, is_banned, can_add_resources, email_notifications_on, text_notifications_on, profile_image_id) VALUES
+INSERT INTO "User" (user_id, username, email, password_hash, email_verified_at, role, created_at, credit_balance, credit_last_reset, is_banned, can_add_resources, email_notifications_on, profile_image_id) VALUES
     -- Owner account
-    (1, 'cc_admin', 'cc.admin@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-10 09:00:00', NULL, 'admin', '2026-08-10 09:00:00', 20, '2026-10-01', FALSE, TRUE, TRUE, FALSE, NULL),
+    (1, 'cc_admin', 'cc.admin@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-10 09:00:00', 'admin', '2026-08-10 09:00:00', 20, '2026-10-01', FALSE, TRUE, TRUE, NULL),
     -- Owner account
-    (2, 'newman_spaces_rk', 'newman.spaces.rk@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-10 10:30:00', NULL, 'staff', '2026-08-10 10:30:00', 20, '2026-10-01', FALSE, TRUE, TRUE, FALSE, NULL),
+    (2, 'newman_spaces_rk', 'newman.spaces.rk@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-10 10:30:00', 'staff', '2026-08-10 10:30:00', 20, '2026-10-01', FALSE, TRUE, TRUE, NULL),
     -- Owner account
-    (3, 'recsports_mccomas_tj', 'recsports.mccomas.tj@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-11 09:15:00', NULL, 'staff', '2026-08-11 09:15:00', 20, '2026-10-01', FALSE, TRUE, TRUE, FALSE, NULL),
+    (3, 'recsports_mccomas_tj', 'recsports.mccomas.tj@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-11 09:15:00', 'staff', '2026-08-11 09:15:00', 20, '2026-10-01', FALSE, TRUE, TRUE, NULL),
     -- Owner account
-    (4, 'recsports_warmem_ab', 'recsports.warmem.ab@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-11 09:40:00', NULL, 'staff', '2026-08-11 09:40:00', 20, '2026-10-01', FALSE, TRUE, TRUE, FALSE, NULL),
+    (4, 'recsports_warmem_ab', 'recsports.warmem.ab@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-11 09:40:00', 'staff', '2026-08-11 09:40:00', 20, '2026-10-01', FALSE, TRUE, TRUE, NULL),
     -- Owner account
-    (5, 'squires_events_mp', 'squires.events.mp@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-12 13:20:00', NULL, 'staff', '2026-08-12 13:20:00', 20, '2026-10-01', FALSE, TRUE, TRUE, FALSE, NULL),
+    (5, 'squires_events_mp', 'squires.events.mp@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-12 13:20:00', 'staff', '2026-08-12 13:20:00', 20, '2026-10-01', FALSE, TRUE, TRUE, NULL),
     -- Journey A
-    (6, 'maya_r', 'maya.r@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-24 10:15:00', '+15405550106', 'student', '2026-08-24 10:15:00', 18, '2026-10-01', FALSE, FALSE, TRUE, TRUE, 7),
+    (6, 'maya_r', 'maya.r@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-24 10:15:00', 'student', '2026-08-24 10:15:00', 18, '2026-10-01', FALSE, FALSE, TRUE, 7),
     -- Journey B
-    (7, 'liam_k', 'liam.k@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-26 16:45:00', '+15405550107', 'student', '2026-08-26 16:45:00', 20, '2026-10-01', FALSE, FALSE, TRUE, FALSE, NULL),
+    (7, 'liam_k', 'liam.k@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-26 16:45:00', 'student', '2026-08-26 16:45:00', 20, '2026-10-01', FALSE, FALSE, TRUE, NULL),
     -- Journey C
-    (8, 'priya_s', 'priya.s@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-20 11:05:00', '+15405550108', 'student', '2026-08-20 11:05:00', 15, '2026-10-01', FALSE, FALSE, TRUE, TRUE, 8),
+    (8, 'priya_s', 'priya.s@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-20 11:05:00', 'student', '2026-08-20 11:05:00', 15, '2026-10-01', FALSE, FALSE, TRUE, 8),
     -- Journey D
-    (9, 'diego_m', 'diego.m@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-03 10:00:00', '+15405550109', 'student', '2026-09-03 10:00:00', 19, '2026-10-01', FALSE, FALSE, TRUE, TRUE, NULL),
-    (10, 'hannah_w', 'hannah.w@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-21 09:30:00', NULL, 'student', '2026-08-21 09:30:00', 18, '2026-10-01', FALSE, FALSE, TRUE, FALSE, NULL),
-    (11, 'noah_b', 'noah.b@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-22 20:10:00', '+15405550111', 'student', '2026-08-22 20:10:00', 16, '2026-10-01', FALSE, FALSE, TRUE, TRUE, NULL),
-    (12, 'sofia_l', 'sofia.l@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-24 13:40:00', '+15405550112', 'student', '2026-08-24 13:40:00', 17, '2026-10-01', FALSE, FALSE, TRUE, FALSE, 9),
-    (13, 'ethan_c', 'ethan.c@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-25 15:00:00', NULL, 'student', '2026-08-25 15:00:00', 18, '2026-10-01', FALSE, FALSE, FALSE, FALSE, NULL),
-    (14, 'zara_h', 'zara.h@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-27 08:20:00', '+15405550114', 'student', '2026-08-27 08:20:00', 17, '2026-10-01', FALSE, FALSE, TRUE, TRUE, NULL),
-    (15, 'owen_p', 'owen.p@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-28 12:00:00', NULL, 'student', '2026-08-28 12:00:00', 20, '2026-10-01', FALSE, FALSE, TRUE, FALSE, NULL),
-    (16, 'aisha_n', 'aisha.n@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-30 17:35:00', '+15405550116', 'student', '2026-08-30 17:35:00', 19, '2026-10-01', FALSE, FALSE, TRUE, FALSE, NULL),
-    (17, 'lucas_g', 'lucas.g@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-01 14:10:00', '+15405550117', 'student', '2026-09-01 14:10:00', 19, '2026-10-01', FALSE, FALSE, FALSE, TRUE, NULL),
-    (18, 'chloe_d', 'chloe.d@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-02 06:50:00', '+15405550118', 'student', '2026-09-02 06:50:00', 18, '2026-10-01', FALSE, FALSE, TRUE, TRUE, NULL),
-    (19, 'marcus_t', 'marcus.t@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-04 19:25:00', NULL, 'student', '2026-09-04 19:25:00', 18, '2026-10-01', FALSE, FALSE, TRUE, FALSE, NULL),
-    (20, 'elena_v', 'elena.v@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-05 10:45:00', '+15405550120', 'student', '2026-09-05 10:45:00', 20, '2026-10-01', FALSE, FALSE, TRUE, FALSE, NULL),
-    (21, 'ben_o', 'ben.o@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-08 21:00:00', NULL, 'student', '2026-09-08 21:00:00', 17, '2026-10-01', FALSE, FALSE, TRUE, FALSE, NULL),
-    (22, 'grace_y', 'grace.y@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-10 12:30:00', '+15405550122', 'student', '2026-09-10 12:30:00', 17, '2026-10-01', FALSE, FALSE, TRUE, TRUE, NULL),
+    (9, 'diego_m', 'diego.m@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-03 10:00:00', 'student', '2026-09-03 10:00:00', 19, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (10, 'hannah_w', 'hannah.w@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-21 09:30:00', 'student', '2026-08-21 09:30:00', 18, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (11, 'noah_b', 'noah.b@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-22 20:10:00', 'student', '2026-08-22 20:10:00', 16, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (12, 'sofia_l', 'sofia.l@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-24 13:40:00', 'student', '2026-08-24 13:40:00', 17, '2026-10-01', FALSE, FALSE, TRUE, 9),
+    (13, 'ethan_c', 'ethan.c@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-25 15:00:00', 'student', '2026-08-25 15:00:00', 18, '2026-10-01', FALSE, FALSE, FALSE, NULL),
+    (14, 'zara_h', 'zara.h@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-27 08:20:00', 'student', '2026-08-27 08:20:00', 17, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (15, 'owen_p', 'owen.p@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-28 12:00:00', 'student', '2026-08-28 12:00:00', 20, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (16, 'aisha_n', 'aisha.n@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-30 17:35:00', 'student', '2026-08-30 17:35:00', 19, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (17, 'lucas_g', 'lucas.g@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-01 14:10:00', 'student', '2026-09-01 14:10:00', 19, '2026-10-01', FALSE, FALSE, FALSE, NULL),
+    (18, 'chloe_d', 'chloe.d@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-02 06:50:00', 'student', '2026-09-02 06:50:00', 18, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (19, 'marcus_t', 'marcus.t@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-04 19:25:00', 'student', '2026-09-04 19:25:00', 18, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (20, 'elena_v', 'elena.v@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-05 10:45:00', 'student', '2026-09-05 10:45:00', 20, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (21, 'ben_o', 'ben.o@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-08 21:00:00', 'student', '2026-09-08 21:00:00', 17, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (22, 'grace_y', 'grace.y@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-10 12:30:00', 'student', '2026-09-10 12:30:00', 17, '2026-10-01', FALSE, FALSE, TRUE, NULL),
     -- Suspended after two no-shows
-    (23, 'ryan_f', 'ryan.f@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-12 23:10:00', NULL, 'student', '2026-09-12 23:10:00', 12, '2026-09-12', TRUE, FALSE, FALSE, FALSE, NULL),
-    (24, 'nina_j', 'nina.j@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-15 09:55:00', NULL, 'student', '2026-09-15 09:55:00', 19, '2026-10-01', FALSE, FALSE, TRUE, FALSE, NULL),
+    (23, 'ryan_f', 'ryan.f@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-12 23:10:00', 'student', '2026-09-12 23:10:00', 12, '2026-09-12', TRUE, FALSE, FALSE, NULL),
+    (24, 'nina_j', 'nina.j@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-15 09:55:00', 'student', '2026-09-15 09:55:00', 19, '2026-10-01', FALSE, FALSE, TRUE, NULL),
     -- Joined 2026-10-09; no reservations yet
-    (25, 'sam_q', 'sam.q@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-10-09 18:40:00', NULL, 'student', '2026-10-09 18:40:00', 20, '2026-10-09', FALSE, FALSE, TRUE, FALSE, NULL);
+    (25, 'sam_q', 'sam.q@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-10-09 18:40:00', 'student', '2026-10-09 18:40:00', 20, '2026-10-09', FALSE, FALSE, TRUE, NULL);
 
 -- Seeded accounts are already verified. These are synthetic consumed
 -- SHA-256 token hashes so the verification-token table contains valid
