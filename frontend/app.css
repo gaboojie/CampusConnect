@@ -94,6 +94,63 @@ button:disabled {
   background: #f4e9ee;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.notification-bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: transparent;
+  cursor: pointer;
+}
+
+.notification-bell[aria-expanded='true'] {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.notification-bell:hover,
+.notification-bell:focus-visible {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.bell-icon {
+  width: 1.4rem;
+  height: 1.4rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.bell-badge {
+  position: absolute;
+  top: 0.1rem;
+  right: 0.05rem;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  box-sizing: border-box;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  color: #630031;
+  background: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.05rem;
+  text-align: center;
+}
+
 .profile-menu {
   position: relative;
 }
@@ -2346,5 +2403,558 @@ a.resource-card:hover {
   display: inline-block;
   margin-top: 0.5rem;
   color: #630031;
+  font-weight: 650;
+}
+
+.chart-panel {
+  margin-bottom: 1rem;
+  box-shadow: none;
+}
+
+.chart-panel h3,
+.admin-columns h3 {
+  margin: 0 0 0.25rem;
+}
+
+.chart {
+  margin: 0.75rem 0 0;
+}
+
+.chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+  color: #586579;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.chart-legend i {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-right: 0.4rem;
+  border-radius: 3px;
+}
+
+.chart-grid {
+  stroke: #eef0f3;
+  stroke-width: 1;
+}
+
+.chart-axis {
+  fill: #586579;
+  font-size: 11px;
+}
+
+.pie {
+  display: grid;
+  gap: 1rem;
+  justify-items: center;
+  margin-top: 0.9rem;
+}
+
+.pie svg {
+  width: min(100%, 200px);
+  height: auto;
+}
+
+.pie-legend {
+  display: grid;
+  gap: 0.5rem;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.88rem;
+}
+
+.pie-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pie-legend i {
+  flex: none;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 3px;
+}
+
+.pie-legend span {
+  flex: 1;
+}
+
+.pie-legend small {
+  color: #586579;
+  font-weight: 500;
+}
+
+.bar-list {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bar-list-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.3rem;
+  font-size: 0.88rem;
+}
+
+.bar-list-row small {
+  color: #586579;
+  font-weight: 500;
+}
+
+.bar-track {
+  height: 0.6rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eef0f3;
+}
+
+.bar-fill {
+  min-width: 2px;
+  height: 100%;
+  border-radius: 999px;
+}
+
+.clickable-row {
+  cursor: pointer;
+}
+
+.clickable-row:focus-visible {
+  outline: 2px solid #630031;
+  outline-offset: -2px;
+}
+
+.resource-admin-modal {
+  display: grid;
+  gap: 1rem;
+  width: min(680px, 100%);
+}
+
+.resource-admin-modal h3 {
+  margin: 0 0 0.4rem;
+}
+
+.resource-admin-modal ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.resource-admin-image {
+  display: block;
+  width: 100%;
+  max-height: 240px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+/* Notifications dropdown */
+.notification-menu {
+  position: relative;
+}
+
+.notification-panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: min(25rem, calc(100vw - 2rem));
+  max-height: min(34rem, 75vh);
+  border-radius: 12px;
+  color: #1f2a3c;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(43, 0, 22, 0.28);
+  overflow: hidden;
+}
+
+.notification-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem 0.5rem;
+}
+
+.notification-panel-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.notification-tabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0 1rem 0.6rem;
+  border-bottom: 1px solid #e4eaf0;
+}
+
+.notification-tabs button {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid #d5dbe3;
+  border-radius: 999px;
+  color: #344258;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.notification-tabs button.active {
+  border-color: #630031;
+  color: #fff;
+  background: #630031;
+}
+
+.notification-panel-body {
+  overflow-y: auto;
+}
+
+.notification-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notification-item {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid #eef0f3;
+}
+
+.notification-item.unread {
+  background: #fdf8fa;
+}
+
+.notification-item p {
+  margin: 0;
+  color: #344258;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.notification-item-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+}
+
+.unread-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-left: auto;
+  border-radius: 50%;
+  background: #630031;
+}
+
+.notification-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.82rem;
+}
+
+.notification-item-actions:empty {
+  display: none;
+}
+
+.notification-empty {
+  margin: 0;
+  padding: 1.25rem 1rem;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.notification-more {
+  display: block;
+  width: 100%;
+  padding: 0.7rem;
+}
+
+.notification-panel .text-button {
+  border: 0;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.notification-panel .text-button:disabled {
+  color: #8a94a3;
+  cursor: default;
+  text-decoration: none;
+}
+
+/* Availability calendar (day grid) */
+.cal-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.cal-toolbar label {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 170px;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.cal-date-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.cal-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.75rem;
+}
+
+.cal-panel {
+  padding: 0;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.cal-panel > p {
+  margin: 0;
+  padding: 1.5rem;
+}
+
+.cal-panel > .cal-note {
+  padding: 0.75rem 1rem;
+}
+
+.cal-scroll {
+  overflow-x: auto;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: 220px minmax(calc(var(--cols) * 28px), 1fr);
+  min-width: calc(220px + var(--cols) * 28px);
+}
+
+.cal-corner,
+.cal-name {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  box-sizing: border-box;
+  border-right: 1px solid #e4eaf0;
+  border-bottom: 1px solid #eef0f3;
+  padding: 0.5rem 0.75rem;
+  background: #fff;
+}
+
+.cal-corner {
+  display: flex;
+  align-items: flex-end;
+  color: #586579;
+  background: #faf6f8;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cal-name {
+  display: grid;
+  align-content: center;
+  gap: 0.1rem;
+  min-height: 52px;
+}
+
+.cal-name strong {
+  font-size: 0.9rem;
+}
+
+.cal-name span {
+  color: #586579;
+  font-size: 0.74rem;
+}
+
+.cal-hours,
+.cal-row {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(28px, 1fr));
+  border-bottom: 1px solid #eef0f3;
+}
+
+.cal-hours {
+  background: #faf6f8;
+}
+
+.cal-hour {
+  border-left: 1px solid #e4eaf0;
+  padding: 0.55rem 0 0.55rem 0.35rem;
+  color: #586579;
+  font-size: 0.72rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.cal-cell {
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  box-sizing: border-box;
+  border: 0;
+  border-left: 1px solid #fff;
+  border-radius: 0;
+  padding: 0;
+}
+
+.cal-open {
+  background: #d9f0e3;
+}
+
+button.cal-open:hover:not(:disabled) {
+  background: #9fdcbd;
+}
+
+.cal-booked {
+  background: #e8a7a7;
+}
+
+.cal-mine {
+  background: #8fb0df;
+}
+
+.cal-maintenance {
+  background: repeating-linear-gradient(45deg, #fff1d6, #fff1d6 6px, #fbe3ae 6px, #fbe3ae 12px);
+}
+
+.cal-closed {
+  background: #f1f2f4;
+}
+
+.cal-past {
+  background: repeating-linear-gradient(45deg, #f6f7f8, #f6f7f8 6px, #eceef1 6px, #eceef1 12px);
+}
+
+button.cal-action {
+  cursor: pointer;
+}
+
+button.cal-booked:hover:not(:disabled) {
+  background: #dc8f8f;
+}
+
+button.cal-mine:hover:not(:disabled) {
+  background: #769fd6;
+}
+
+.cal-cell:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid #630031;
+  outline-offset: -2px;
+}
+
+.cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  color: #586579;
+  font-size: 0.82rem;
+  list-style: none;
+}
+
+.cal-legend i {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  margin-right: 0.4rem;
+  border-radius: 3px;
+  vertical-align: -2px;
+}
+
+.cal-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+a.icon-button {
+  text-decoration: none;
+}
+
+.icon-button.icon-danger {
+  color: #a13232;
+  background: #fbe9e9;
+}
+
+.icon-button.icon-danger:hover:not(:disabled) {
+  color: #fff;
+  background: #a13232;
+}
+
+.compact-link {
+  margin-top: 0;
+  font-size: 0.85rem;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.row-warning {
+  max-width: 260px;
+  margin: 0.4rem 0 0;
+  color: #a13232;
+  font-size: 0.78rem;
+  white-space: normal;
+}
+
+.admin-form {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.admin-form h3 {
+  margin: 0;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.admin-form-grid label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.82rem;
   font-weight: 650;
 }

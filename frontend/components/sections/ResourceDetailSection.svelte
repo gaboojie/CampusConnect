@@ -4,6 +4,8 @@
   import { formatClock, formatDate, formatDateTime, formatDuration, formatRating } from '../../lib/format'
   import { routeHash } from '../../lib/routes'
   import type { ResourceDetails, SlotInput } from '../../lib/types'
+  import { suggestSlot } from '../../lib/calendar'
+  import AvailabilityCalendar from '../AvailabilityCalendar.svelte'
   import ReservationForm from '../reservations/ReservationForm.svelte'
 
   export let resourceId: string
@@ -15,6 +17,9 @@
   let error = ''
   let controller: AbortController | undefined
   let reserving = false
+  // Set when a slot is chosen on the availability grid, so the form opens prefilled.
+  let pickedSlot: SlotInput | null = null
+  let pickedNote = ''
 
   $: backHref = `#/resources${backQuery ? `?${backQuery}` : ''}`
   $: image = resource?.images[0] ?? null
@@ -100,10 +105,27 @@
           </p>
 
           <div class="reserve-box">
-            <button type="button" on:click={() => (reserving = true)}>Reserve</button>
+            <button type="button" on:click={() => { pickedSlot = null; pickedNote = ''; reserving = true }}>Reserve</button>
           </div>
         </div>
       </div>
+
+      <section class="detail-block detail-availability">
+        <h3>Availability</h3>
+        <p class="muted">Green slots are open. Click one to reserve it. Red slots are booked, and blue slots are yours.</p>
+        {#key resource.id}
+          <AvailabilityCalendar
+            resourceId={resource.id}
+            onPickSlot={(slotResource, start, date) => {
+              const suggestion = suggestSlot(slotResource, date, start)
+              pickedSlot = suggestion.slot
+              pickedNote = suggestion.note
+              reserving = true
+            }}
+            onPickBooking={() => (window.location.hash = routeHash('reservations'))}
+          />
+        {/key}
+      </section>
 
       <div class="detail-info-grid">
         <section class="detail-block detail-block-wide">
@@ -221,12 +243,12 @@
     {#if reserving}
       <ReservationForm
         title={resource.name}
-        subtitle="Reserve"
+        subtitle={pickedSlot && pickedNote ? pickedNote : 'Reserve'}
         submitLabel="Reserve"
-        initial={initialSlot()}
+        initial={pickedSlot ?? initialSlot()}
         maxMinutes={resource.maxReservationMinutes ?? 240}
         onSubmit={reserve}
-        onClose={() => (reserving = false)}
+        onClose={() => { reserving = false; pickedSlot = null }}
       />
     {/if}
   {/if}

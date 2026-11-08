@@ -29,7 +29,13 @@ type FakeVerificationToken = {
 };
 
 class FakeDatabase {
-  users: Array<DatabaseUserRow & { password_hash: string | null }> = [];
+  users: Array<
+    DatabaseUserRow & {
+      password_hash: string | null;
+      failed_login_attempts?: number;
+      locked_until?: Date | null;
+    }
+  > = [];
   sessions: FakeSession[] = [];
   verificationTokens: FakeVerificationToken[] = [];
   nextUserId = 1;
@@ -143,6 +149,38 @@ class FakeClient implements DatabaseClient {
       return { rows: [], rowCount: 1 };
     }
 
+    // Sign-in lockout bookkeeping (mirrors recordFailedLogin / clearFailedLogins).
+    if (query.startsWith("UPDATE \"User\"") && query.includes("failed_login_attempts + 1")) {
+      const [userId, maxAttempts, lockSeconds] = values as [number, number, number];
+      const user = this.database.users.find((candidate) => candidate.user_id === userId);
+      if (!user) return { rows: [], rowCount: 0 };
+
+      const next = (user.failed_login_attempts ?? 0) + 1;
+      if (next >= maxAttempts) {
+        user.failed_login_attempts = 0;
+        user.locked_until = new Date(Date.now() + lockSeconds * 1000);
+      } else {
+        user.failed_login_attempts = next;
+      }
+      const remaining = user.locked_until
+        ? Math.max(0, Math.ceil((user.locked_until.getTime() - Date.now()) / 1000))
+        : 0;
+      return {
+        rows: [{ locked: user.failed_login_attempts === 0, lock_seconds: remaining }] as T[],
+        rowCount: 1,
+      };
+    }
+
+    if (query.startsWith("UPDATE \"User\"") && query.includes("failed_login_attempts = 0, locked_until = NULL")) {
+      const [userId] = values as [number];
+      const user = this.database.users.find((candidate) => candidate.user_id === userId);
+      if (user) {
+        user.failed_login_attempts = 0;
+        user.locked_until = null;
+      }
+      return { rows: [], rowCount: user ? 1 : 0 };
+    }
+
     if (query.startsWith("UPDATE \"User\"")) {
       const [userId] = values as [number];
       const user = this.database.users.find((candidate) => candidate.user_id === userId);
@@ -183,7 +221,16 @@ class FakeClient implements DatabaseClient {
           candidate.username === identifier,
       );
 
-      return { rows: user ? [user as T] : [], rowCount: user ? 1 : 0 };
+      const row = user
+        ? {
+            ...user,
+            lock_seconds_remaining: user.locked_until
+              ? Math.max(0, Math.ceil((user.locked_until.getTime() - Date.now()) / 1000))
+              : 0,
+          }
+        : undefined;
+
+      return { rows: row ? [row as T] : [], rowCount: row ? 1 : 0 };
     }
 
     if (query.startsWith("DELETE FROM \"Session\"")) {
@@ -619,5 +666,137 @@ describe("authentication routes", () => {
     );
 
     expect(response.status).toBe(200);
+  });
+});
+
+describe("sign-in lockout", () => {
+  const PASSWORD = "correct horse battery staple";
+
+  async function setup() {
+    const database = new FakeDatabase();
+    const app = createApp({ createDatabaseClient: () => database.createClient() });
+    const environment = testEnvironment(database);
+
+    database.users.push({
+      user_id: 1,
+      username: "maya_r",
+      email: "maya.r@vt.edu",
+      password_hash: await hashPassword(PASSWORD),
+      role: "student",
+      created_at: new Date(),
+      credit_balance: 20,
+      credit_last_reset: new Date(),
+      email_notifications_on: true,
+      can_add_resources: false,
+      email_verified_at: new Date(),
+      is_banned: false,
+    });
+
+    const login = (password: string, identifier = "maya.r@vt.edu") =>
+      app.request(
+        "http://localhost/api/auth/login",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ identifier, password }),
+        },
+        environment,
+      );
+
+    return { database, login, user: database.users[0] };
+  }
+
+  async function failTimes(login: (password: string) => Response | Promise<Response>, times: number) {
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt < times; attempt += 1) {
+      statuses.push((await login("wrong password")).status);
+    }
+    return statuses;
+  }
+
+  it("locks the account for 5 minutes after the fifth wrong password", async () => {
+    const { login, user } = await setup();
+
+    expect(await failTimes(login, 4)).toEqual([401, 401, 401, 401]);
+
+    const fifth = await login("wrong password");
+    expect(fifth.status).toBe(429);
+    expect(fifth.headers.get("retry-after")).toBe("300");
+    expect(await fifth.json()).toEqual({
+      error: "Too many failed sign-in attempts. Please wait 5 minutes before trying again.",
+      retryAfterSeconds: 300,
+    });
+    expect(user.locked_until).toBeInstanceOf(Date);
+  });
+
+  it("refuses even the correct password while locked, without starting a session", async () => {
+    const { login } = await setup();
+    await failTimes(login, 5);
+
+    const response = await login(PASSWORD);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(((await response.json()) as { error: string }).error).toContain("wait");
+  });
+
+  it("lets the user in again once the lock has expired, and clears the lock", async () => {
+    const { login, user } = await setup();
+    await failTimes(login, 5);
+    user.locked_until = new Date(Date.now() - 1_000);
+
+    const response = await login(PASSWORD);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie")).toContain("campusconnect_session=");
+    expect(user.locked_until).toBeNull();
+    expect(user.failed_login_attempts).toBe(0);
+  });
+
+  it("counts a fresh five attempts after a lock expires", async () => {
+    const { login, user } = await setup();
+    await failTimes(login, 5);
+    user.locked_until = new Date(Date.now() - 1_000);
+
+    expect(await failTimes(login, 4)).toEqual([401, 401, 401, 401]);
+    expect((await login("wrong password")).status).toBe(429);
+  });
+
+  it("resets the failure count after a successful sign-in", async () => {
+    const { login } = await setup();
+
+    expect(await failTimes(login, 4)).toEqual([401, 401, 401, 401]);
+    expect((await login(PASSWORD)).status).toBe(200);
+    expect(await failTimes(login, 4)).toEqual([401, 401, 401, 401]);
+  });
+
+  it("shows the minutes that are left, rounded up", async () => {
+    const { login, user } = await setup();
+    await failTimes(login, 5);
+
+    user.locked_until = new Date(Date.now() + 90_000);
+    expect(((await (await login(PASSWORD)).json()) as { error: string }).error).toContain("wait 2 minutes");
+
+    user.locked_until = new Date(Date.now() + 20_000);
+    expect(((await (await login(PASSWORD)).json()) as { error: string }).error).toContain("wait 1 minute ");
+  });
+
+  it("does not lock unknown accounts or count attempts on unverified ones", async () => {
+    const { login, user } = await setup();
+
+    expect(await failTimes((password) => login(password, "nobody@vt.edu"), 6)).toEqual([401, 401, 401, 401, 401, 401]);
+
+    user.email_verified_at = null;
+    expect(await failTimes(login, 6)).toEqual([401, 401, 401, 401, 401, 401]);
+    expect(user.failed_login_attempts ?? 0).toBe(0);
+  });
+
+  it("locks only the account that was attacked", async () => {
+    const { database, login } = await setup();
+    database.users.push({ ...database.users[0], user_id: 2, username: "other_user", email: "other@vt.edu" });
+
+    await failTimes(login, 5);
+
+    expect((await login(PASSWORD, "other@vt.edu")).status).toBe(200);
   });
 });

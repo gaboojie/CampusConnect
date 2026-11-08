@@ -4,6 +4,25 @@ CampusConnect is a resource sharing project for Virginia Tech's CS 5614: Databas
 
 _Authors: Faria Binta Awal, Ashwaq Alaklabi, Rokeshuvaraj Nagarajan, & Gabriel Jackson._
 
+## Features
+
+- **Accounts:** sign up with a `@vt.edu` address and verify it by email. Sessions use an HttpOnly cookie. After five wrong passwords in a row, an account is locked for five minutes and the sign-in form says how long to wait.
+- **Browse resources:** search and filter campus resources by type, building, date, time, and availability. Each resource page shows its location, features, weekly hours, maintenance, and reviews.
+- **Availability calendar:** every resource page has a day grid of half-hour slots. Available, booked, your own, maintenance, and closed times are colored differently. Clicking an available slot opens the reservation form, prefilled with up to two hours (shortened to the gap before the next booking, maintenance, or closing time).
+- **Reservations and credits:** reserve, reschedule, and cancel. Each booking costs credits, and cancellations are refunded.
+- **Listings:** members who may add resources can create and manage their own listings, including images stored in Cloudflare R2.
+- **Notifications:** email reminders and cancellation notices are sent through Cloudflare Workflows. The bell in the top bar opens an in-app dropdown with an unread count, per-item and bulk "mark as read", and an All/Unread filter.
+- **Announcements:** current maintenance notices and newly listed resources.
+- **Admin panel** (`/admin`, admins only):
+  - Overview with charts of activity, reservation status, and user roles.
+  - Users: create, edit, ban or unban, promote or demote, and delete accounts.
+  - Resources: view details and delete (upcoming reservations are cancelled and refunded, and the people affected are notified).
+  - Reservations: a calendar of every resource's bookings, or a list view.
+
+## Screenshots
+
+Screenshots have not been added yet. Save images in `docs/screenshots/` and link them here. Suggested set: sign-in, browse resources, a resource page with its availability calendar, the notifications dropdown, and the admin overview.
+
 ## Requirements
 
 - Node.js 22 or newer, specified by `.nvmrc`.
@@ -100,17 +119,19 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
 
 ## Migrations and environment variables
 
-- `migrations/dev/` contains SQL for Neon `dev` and is applied manually by the owner when the shared dev schema changes.
-- `migrations/prod/` contains production-safe SQL for Neon `main` and runs separately with `npm run migrate:prod`.
-- Each environment has two files: `001_init.sql` creates the complete schema, and `002_seed.sql` inserts the synthetic grading/demo data.
-- `scripts/migrate.ts` applies files in order and records applied versions in `schema_migrations`.
+- `db/migrations/` holds one ordered set of SQL files shared by every environment. `--environment dev|prod` only chooses which database the runner connects to.
+- `001_schema.sql` creates the complete schema and `002_seed.sql` inserts the synthetic grading/demo data.
+- `003_notification_read.sql` adds `"Notification".read_at`, which tracks read state for the in-app notifications dropdown.
+- `004_login_lockout.sql` adds `"User".failed_login_attempts` and `"User".locked_until`, which power the five-attempt sign-in lockout.
+- `003` and `004` are additive and safe to re-run. An existing database picks them up by running the migrate command, with no reset needed. Run them on Neon `dev` first, then on `main` after review.
+- `db/scripts/migrate.ts` applies files in order and records applied versions in `schema_migrations`, so already-applied files are skipped.
 - `npm run migrate:dev` and `npm run migrate:prod` automatically use `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` from `.env.dev` or `.env.prod`, respectively. For example:
 
   ```sh
   npm run migrate:dev
   ```
 
-- `scripts/reset-database.ts` can drop all tables in the selected database after an exact confirmation prompt. Use it only for an intentional reset.
+- `db/scripts/reset-database.ts` can drop all tables in the selected database after an exact confirmation prompt. Use it only for an intentional reset.
 - Database reset is PostgreSQL-only and never deletes or modifies objects in either Cloudflare R2 bucket. R2 images are deleted only through the authenticated listing-management flow after ownership is verified.
 - Both dev and prod database commands use `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` from the selected environment file. For production, verify the Neon `main` connection string in `.env.prod` before running the command:
 
@@ -118,7 +139,7 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
   npm run migrate:prod
   ```
 
-- The consolidated migration names are intended for a fresh database. If a database already has the older migration history (`001_schema`, `002_seed`, `003_authentication`, or `004_email_verification`), reset that database before applying the new two-file set.
+- If a database still has an older migration history (for example `001_init`, `003_authentication`, or `004_email_verification`), those version names no longer match the files in `db/migrations/`. Reset that database before running the migrations.
 - Never run dev migrations against Neon `main` or production migrations against Neon `dev` without reviewing them.
 - The production GitHub Action never runs database migrations. A designated maintainer must run production migrations separately after review, a restore point, and explicit approval.
 - The designated maintainer can run a production migration from a secure terminal using `.env.prod`; production migrations must target Neon `main`, not the dev branch.
@@ -142,6 +163,10 @@ The authentication API is:
 - `GET /api/auth/me`
 
 The Neon database health endpoint remains public. Other `/api/*` requests require a valid session.
+
+After five consecutive wrong passwords for a verified account, `POST /api/auth/login` answers `429` with a `Retry-After` header and the message "Too many failed sign-in attempts. Please wait 5 minutes before trying again." Even the correct password is refused until the lock ends. A successful sign-in resets the count. Attempts on unknown usernames or unverified accounts are not counted.
+
+Other signed-in routes include `GET /api/calendar` (day availability), `GET /api/notifications` with `POST /api/notifications/:id/read` and `POST /api/notifications/read-all` (the notifications dropdown), and the admin-only `/api/admin/*` routes.
 
 To reset the dev database, the command automatically uses `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` from `.env.dev`; confirm the prompt when asked:
 
@@ -169,16 +194,27 @@ The command accepts exactly one action: `--ban true|false`, `--delete`, `--can_a
 ## Project structure
 
 ```text
-src/                         Svelte frontend
-src/App.svelte               Authentication and profile landing page
-src/app.css                  Frontend styles
-worker/index.ts              Hono Worker API, health check, and asset fallback
-worker/auth.ts               Password, session-token, and signup validation helpers
-worker/db.ts                 Testable PostgreSQL client lifecycle helper
-tests/                       Vitest application tests
-migrations/dev/              Development SQL migrations
-migrations/prod/             Production SQL migrations
-scripts/migrate.ts           Transactional migration runner
+README.md                    Project description, features, and setup instructions
+docs/                        Architecture notes, diagrams, and report materials
+db/                          Database boundary
+db/client.ts                 PostgreSQL client wrapper
+db/repositories/             All SQL-backed queries (admin, auth, calendar, inbox, notifications, resources, ...)
+db/migrations/               Ordered SQL: schema, seed data, notification read state, login lockout
+db/scripts/                  migrate.ts, reset-database.ts, and admin-command.ts
+db/reference/                Seed images and data-source notes
+backend/                     Server-side code
+backend/index.ts             Hono Worker API, middleware, and asset fallback
+backend/auth.ts              Password, session-token, and signup validation helpers
+backend/notification-workflow.ts  Cloudflare Workflow that sends notification emails
+frontend/                    Svelte interface
+frontend/App.svelte          Header, sign-in and sign-up, and the app/admin switch
+frontend/components/         Layouts, sections, calendar, charts, dialogs, and the notification bell
+frontend/lib/                API client, routes, shared types, and formatting helpers
+frontend/app.css             Frontend styles
+roles/                       Each member's contributions (one page per member)
+reports/                     Reserved for report files
+tests/                       Vitest application and API tests
+public/                      Static assets copied into the build
 wrangler.jsonc               Cloudflare Worker, R2, Hyperdrive, and environment config
 package.json                 npm scripts and dependency ranges
 package-lock.json            Locked npm dependency versions

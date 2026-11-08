@@ -1,4 +1,9 @@
-export type RouteId = 'profile' | 'resources' | 'reservations' | 'listings' | 'notifications' | 'announcements'
+export type RouteId =
+  | 'profile'
+  | 'resources'
+  | 'reservations'
+  | 'listings'
+  | 'announcements'
 
 export type AppRoute = {
   id: RouteId
@@ -35,12 +40,6 @@ export const routes: AppRoute[] = [
     label: 'My Listings',
     description: 'Add and manage the resources you offer to the Virginia Tech community.',
     icon: ['M4 4h7.5l8.5 8.5-7.5 7.5L4 11.5Z', 'M8.5 8.5h.01'],
-  },
-  {
-    id: 'notifications',
-    label: 'Notifications',
-    description: 'Updates about your reservations and listings.',
-    icon: ['M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15Z', 'M10 20.5a2 2 0 0 0 4 0'],
   },
   {
     id: 'announcements',

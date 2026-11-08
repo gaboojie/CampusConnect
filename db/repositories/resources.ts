@@ -140,7 +140,7 @@ export function parsePositiveId(raw: string | undefined | null): number | null {
   return value >= 1 && value <= MAX_INTEGER_ID ? value : null;
 }
 
-function isCalendarDate(value: string): boolean {
+export function isCalendarDate(value: string): boolean {
   const match = DATE_PATTERN.exec(value);
   if (!match) return false;
   const [year, month, day] = match.slice(1).map(Number);
