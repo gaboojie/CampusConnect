@@ -33,6 +33,19 @@
 					"RESEND_FROM_EMAIL"
 				]
 			},
+			"workflows": [
+				{
+					"binding": "NOTIFICATION_WORKFLOW",
+					"name": "campusconnect-dev-notification-email",
+					"class_name": "NotificationWorkflow"
+				}
+			],
+			"triggers": {
+				"crons": [
+					"*/15 * * * *",
+					"0 6 * * *"
+				]
+			},
 			"hyperdrive": [
 				{
 					"binding": "DB",
@@ -65,6 +78,13 @@
 					"RESEND_FROM_EMAIL"
 				]
 			},
+			"workflows": [
+				{
+					"binding": "NOTIFICATION_WORKFLOW",
+					"name": "campusconnect-production-notification-email",
+					"class_name": "NotificationWorkflow"
+				}
+			],
 			"hyperdrive": [
 				{
 					"binding": "DB",

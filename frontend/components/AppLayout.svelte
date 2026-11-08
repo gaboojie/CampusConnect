@@ -15,6 +15,8 @@
   export let user: PublicUser
   export let submitting: boolean
   export let onLogout: () => void
+  export let onAccountDeleted: () => void
+  export let onUserUpdated: (user: PublicUser) => void
 
   const COLLAPSED_STORAGE_KEY = 'campusconnect.sidebarCollapsed'
 
@@ -68,13 +70,14 @@
 
   onMount(syncRoute)
 
-  $: route = location.route
+  $: route = user.isBanned ? routes[0] : location.route
+  $: visibleRoutes = user.isBanned ? routes.filter((candidate) => candidate.id === 'profile') : routes
 </script>
 
 <svelte:window on:hashchange={syncRoute} on:keydown={handleKeydown} />
 
 <div class="app-layout" class:sidebar-collapsed={collapsed} class:drawer-open={drawerOpen}>
-  <Sidebar {routes} currentId={route.id} {collapsed} onToggle={toggleCollapsed} onNavigate={closeDrawer} />
+  <Sidebar routes={visibleRoutes} currentId={route.id} {collapsed} onToggle={toggleCollapsed} onNavigate={closeDrawer} />
 
   {#if drawerOpen}
     <button type="button" class="drawer-backdrop" aria-label="Close navigation" on:click={closeDrawer}></button>
@@ -97,8 +100,8 @@
       <span class="mobile-bar-title">{route.label}</span>
     </div>
 
-    {#if route.id === 'profile'}
-      <ProfileSection {user} {submitting} {onLogout} />
+    {#if user.isBanned || route.id === 'profile'}
+      <ProfileSection {user} {submitting} {onLogout} {onAccountDeleted} {onUserUpdated} />
     {:else if route.id === 'resources' && location.subpath}
       <ResourceDetailSection resourceId={location.subpath} backQuery={location.query} />
     {:else if route.id === 'resources'}

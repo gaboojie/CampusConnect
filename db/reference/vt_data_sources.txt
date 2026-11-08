@@ -139,7 +139,6 @@ Users ("user"), all SIMULATED:
   - Usernames are fictional (e.g. maya_r, recsports_mccomas_tj) and do not
     identify real people.
   - Emails use the reserved example.com domain (RFC 2606).
-  - Phone numbers use the fictional +1-540-555-0100..0199 range.
   - Roles: 'admin' (1), 'staff' (4, the resource owners), 'student' (20).
   - ryan_f is suspended (is_banned = TRUE) after two no-shows.
   - sam_q joined on 2026-10-09 and has no reservations yet.

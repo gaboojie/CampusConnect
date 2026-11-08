@@ -50,10 +50,14 @@
     aria-label={`Account menu for ${user.username}`}
     on:click={() => open = !open}
   >
-    <svg class="user-icon" viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="8" r="3.25" fill="none" stroke="currentColor" stroke-width="1.8" />
-      <path d="M5.5 20c.7-3.7 2.9-5.5 6.5-5.5s5.8 1.8 6.5 5.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
-    </svg>
+    {#if user.profileImageUrl}
+      <img class="user-icon account-avatar" src={user.profileImageUrl} alt="" />
+    {:else}
+      <svg class="user-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="8" r="3.25" fill="none" stroke="currentColor" stroke-width="1.8" />
+        <path d="M5.5 20c.7-3.7 2.9-5.5 6.5-5.5s5.8 1.8 6.5 5.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+      </svg>
+    {/if}
     <span>{user.username}</span>
   </button>
 

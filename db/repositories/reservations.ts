@@ -10,6 +10,11 @@ import {
   type Slot,
   type Validation,
 } from "./resources";
+import {
+  createReservationCancellationNotification,
+  createReservationReminderNotification,
+  skipPendingReservationReminders,
+} from "./notifications";
 
 export const MIN_RESERVATION_MINUTES = 15;
 // Used when a resource does not set its own max_reservation_time.
@@ -32,7 +37,7 @@ export type MyReservations = {
 };
 
 export type ServiceResult<T> =
-  | { ok: true; value: T }
+  | { ok: true; value: T; notificationIds?: number[] }
   | { ok: false; status: 400 | 403 | 404 | 409; error: string };
 
 type ReservationRow = {
@@ -303,7 +308,7 @@ export async function createReservation(
   userId: number,
   input: { resourceId: number; slot: Slot },
 ): Promise<ServiceResult<Reservation>> {
-  return inTransaction(client, async () => {
+  return inTransaction<Reservation>(client, async () => {
     const locked = await lockResourceAndUser(client, input.resourceId, userId);
     if (!locked.ok) return locked;
 
@@ -322,7 +327,16 @@ export async function createReservation(
       [userId, input.resourceId, input.slot.start, input.slot.end],
     );
 
-    return { ok: true, value: toReservation(inserted.rows[0]) };
+    const notificationId = await createReservationReminderNotification(
+      client,
+      inserted.rows[0].reservation_id,
+    );
+
+    return {
+      ok: true,
+      value: toReservation(inserted.rows[0]),
+      notificationIds: [notificationId],
+    };
   });
 }
 
@@ -332,7 +346,7 @@ export async function rescheduleReservation(
   reservationId: number,
   slot: Slot,
 ): Promise<ServiceResult<Reservation>> {
-  return inTransaction(client, async () => {
+  return inTransaction<Reservation>(client, async () => {
     const existing = await client.query<{ user_id: number; resource_id: number }>(
       `
         SELECT user_id, resource_id
@@ -379,7 +393,18 @@ export async function rescheduleReservation(
       [reservationId, slot.start, slot.end],
     );
 
-    return { ok: true, value: toReservation(updated.rows[0]) };
+    await skipPendingReservationReminders(
+      client,
+      reservationId,
+      "Reservation was rescheduled.",
+    );
+    const notificationId = await createReservationReminderNotification(client, reservationId);
+
+    return {
+      ok: true,
+      value: toReservation(updated.rows[0]),
+      notificationIds: [notificationId],
+    };
   });
 }
 
@@ -388,7 +413,7 @@ export async function cancelReservation(
   userId: number,
   reservationId: number,
 ): Promise<ServiceResult<Reservation>> {
-  return inTransaction(client, async () => {
+  return inTransaction<Reservation>(client, async () => {
     const current = await client.query<{ user_id: number; status: string; started: boolean }>(
       `
         SELECT user_id, status, start_time <= ${CAMPUS_NOW_SQL} AS started
@@ -418,7 +443,22 @@ export async function cancelReservation(
       [reservationId],
     );
 
-    return { ok: true, value: toReservation(updated.rows[0]) };
+    await skipPendingReservationReminders(
+      client,
+      reservationId,
+      "Reservation was cancelled.",
+    );
+    const notificationId = await createReservationCancellationNotification(client, {
+      userId,
+      reservationId,
+      message: `You cancelled your reservation for ${updated.rows[0].resource_name} in ${updated.rows[0].building_name} on ${updated.rows[0].start_time}–${updated.rows[0].end_time}.`,
+    });
+
+    return {
+      ok: true,
+      value: toReservation(updated.rows[0]),
+      notificationIds: [notificationId],
+    };
   });
 }
 

@@ -45,7 +45,6 @@
 
       <dl class="profile-details">
         <div><dt>Role</dt><dd>{user.role}</dd></div>
-        <div><dt>Phone</dt><dd>{user.phoneNumber ?? 'Not provided'}</dd></div>
         <div><dt>Joined</dt><dd>{formatDateTime(user.createdAt.slice(0, 19))}</dd></div>
         <div><dt>Email verified</dt><dd>{user.emailVerifiedAt ? formatDateTime(user.emailVerifiedAt.slice(0, 19)) : 'Not verified'}</dd></div>
         <div><dt>Credits</dt><dd>{user.creditBalance}</dd></div>
@@ -53,7 +52,6 @@
         <div><dt>Can add resources</dt><dd>{yesNo(user.canAddResources)}</dd></div>
         <div><dt>Banned</dt><dd>{yesNo(user.isBanned)}</dd></div>
         <div><dt>Email notifications</dt><dd>{onOff(user.emailNotificationsOn)}</dd></div>
-        <div><dt>SMS notifications</dt><dd>{onOff(user.textNotificationsOn)}</dd></div>
         <div><dt>Resources owned</dt><dd>{user.resourcesOwned}</dd></div>
         <div>
           <dt>Reservations</dt>

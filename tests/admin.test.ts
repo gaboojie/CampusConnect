@@ -7,7 +7,6 @@ const userRow = {
   user_id: 7,
   username: "alex_k",
   email: "alex.k@vt.edu",
-  phone_number: "5405550101",
   role: "student",
   created_at: "2026-08-24T10:00:00Z",
   email_verified_at: "2026-08-24T10:05:00Z",
@@ -16,7 +15,6 @@ const userRow = {
   is_banned: false,
   can_add_resources: false,
   email_notifications_on: true,
-  text_notifications_on: false,
   total: "31",
 };
 

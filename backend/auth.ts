@@ -11,31 +11,31 @@ export type PublicUser = {
   userId: number;
   username: string;
   email: string;
-  phoneNumber: string | null;
   role: string;
   createdAt: string;
   creditBalance: number;
   creditLastReset: string;
   emailNotificationsOn: boolean;
-  textNotificationsOn: boolean;
   canAddResources: boolean;
+  isBanned: boolean;
+  profileImageUrl: string | null;
 };
 
 export type DatabaseUserRow = {
   user_id: number;
   username: string;
   email: string;
-  phone_number: string | null;
   role: string;
   created_at: string | Date;
   credit_balance: number;
   credit_last_reset: string | Date;
   email_notifications_on: boolean;
-  text_notifications_on: boolean;
   can_add_resources: boolean;
   email_verified_at?: string | Date | null;
   password_hash?: string | null;
   is_banned?: boolean;
+  is_account_deleted?: boolean;
+  profile_image_id?: number | null;
 };
 
 export type SignupInput = {
@@ -43,9 +43,7 @@ export type SignupInput = {
   email: string;
   password: string;
   confirmPassword: string;
-  phoneNumber: string | null;
   emailNotificationsOn: boolean;
-  textNotificationsOn: boolean;
 };
 
 export type SignupValidation =
@@ -213,13 +211,8 @@ export function validateSignupInput(body: unknown): SignupValidation {
   const password = typeof values.password === "string" ? values.password : "";
   const confirmPassword =
     typeof values.confirmPassword === "string" ? values.confirmPassword : "";
-  const phoneNumber =
-    typeof values.phoneNumber === "string" && values.phoneNumber.trim()
-      ? values.phoneNumber.trim()
-      : null;
   const emailNotificationsOn =
     values.emailNotificationsOn === undefined ? true : values.emailNotificationsOn === true;
-  const textNotificationsOn = values.textNotificationsOn === true && phoneNumber !== null;
   const fieldErrors: Record<string, string> = {};
 
   if (!/^[A-Za-z0-9_]{3,32}$/.test(username)) {
@@ -234,10 +227,6 @@ export function validateSignupInput(body: unknown): SignupValidation {
   if (password !== confirmPassword) {
     fieldErrors.confirmPassword = "The passwords do not match.";
   }
-  if (phoneNumber && phoneNumber.length > 16) {
-    fieldErrors.phoneNumber = "Use a phone number with 16 or fewer characters.";
-  }
-
   if (Object.keys(fieldErrors).length > 0) {
     return { ok: false, fieldErrors };
   }
@@ -249,9 +238,7 @@ export function validateSignupInput(body: unknown): SignupValidation {
       email,
       password,
       confirmPassword,
-      phoneNumber,
       emailNotificationsOn,
-      textNotificationsOn,
     },
   };
 }
@@ -293,13 +280,13 @@ export function serializeUser(row: DatabaseUserRow): PublicUser {
     userId: row.user_id,
     username: row.username,
     email: row.email,
-    phoneNumber: row.phone_number,
     role: row.role,
     createdAt: new Date(row.created_at).toISOString(),
     creditBalance: row.credit_balance,
     creditLastReset: new Date(row.credit_last_reset).toISOString().slice(0, 10),
     emailNotificationsOn: row.email_notifications_on,
-    textNotificationsOn: row.text_notifications_on,
     canAddResources: row.can_add_resources,
+    isBanned: row.is_banned === true,
+    profileImageUrl: row.profile_image_id == null ? null : `/api/profile-images/${row.profile_image_id}`,
   };
 }

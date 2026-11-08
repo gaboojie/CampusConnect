@@ -50,6 +50,7 @@ class FakeReservationDatabase {
   maintenance: Array<{ resourceId: number; start: string; end: string }> = [];
   reservations: FakeReservation[] = [];
   nextId = 100;
+  nextNotificationId = 1000;
   locksEnabled = true;
   // Every query, tagged with the client that sent it.
   log: Array<{ client: number; text: string; values: readonly unknown[] }> = [];
@@ -147,13 +148,11 @@ class FakeReservationDatabase {
               user_id: userId,
               username: `user${userId}`,
               email: `user${userId}@vt.edu`,
-              phone_number: null,
               role: "student",
               created_at: new Date("2026-08-24T10:00:00Z"),
               credit_balance: 20,
               credit_last_reset: new Date("2026-10-01T00:00:00Z"),
               email_notifications_on: true,
-              text_notifications_on: false,
               is_banned: false,
             }];
       }
@@ -198,6 +197,12 @@ class FakeReservationDatabase {
       if (query.includes('INSERT INTO "Reservation"')) {
         const [userId, resourceId, start, end] = values as [number, number, string, string];
         return [this.row(this.addReservation({ userId, resourceId, start, end, status: "confirmed" }))];
+      }
+      if (query.includes('INSERT INTO "Notification"')) {
+        return [{ notification_id: this.nextNotificationId++ }];
+      }
+      if (query.includes('UPDATE "Notification"')) {
+        return [];
       }
       if (query.includes("SET start_time = $2::timestamp")) {
         const reservation = byId(values[0])!;
@@ -324,8 +329,11 @@ describe("POST /api/reservations", () => {
     expect(queries[3]).toMatch(/^SELECT \$2::timestamp >/);
     expect(queries[4]).toMatch(/INSERT INTO "Reservation"/);
     expect(queries[4]).toMatch(/'confirmed'/);
-    expect(queries[5]).toBe("COMMIT");
-    expect(queries).toHaveLength(6);
+    expect(queries[7]).toBe("COMMIT");
+    expect(queries[5]).toMatch(/INSERT INTO "Notification"/);
+    expect(database.log[5].values[1]).toBe("reservation_reminder");
+    expect(queries[6]).toMatch(/UPDATE "Notification"/);
+    expect(queries).toHaveLength(8);
     expect(database.log[3].values).toEqual([1, "2026-10-20 10:00", "2026-10-20 11:00", MAYA]);
   });
 
@@ -518,6 +526,8 @@ describe("PATCH /api/reservations/:id", () => {
     expect(queries.indexOf(LOCK_USER)).toBeLessThan(checksAt);
     expect(queries.findIndex((text) => text.endsWith("FOR UPDATE") && text.includes('"Reservation"'))).toBeLessThan(checksAt);
     expect(queries.findIndex(isWrite)).toBeGreaterThan(checksAt);
+    expect(queries.some((text) => text.includes("email_status = 'skipped'"))).toBe(true);
+    expect(database.log.some((entry) => entry.values.includes("reservation_reminder"))).toBe(true);
     expect(queries.at(-1)).toBe("COMMIT");
   });
 
@@ -618,6 +628,8 @@ describe("POST /api/reservations/:id/cancel", () => {
     expect(queries[0]).toBe("BEGIN");
     expect(queries[1]).toMatch(/FROM "Reservation" WHERE reservation_id = \$1 FOR UPDATE$/);
     expect(queries[2]).toMatch(/SET status = 'cancelled'/);
+    expect(queries.some((text) => text.includes("email_status = 'skipped'"))).toBe(true);
+    expect(database.log.some((entry) => entry.values.includes("reservation_cancelled"))).toBe(true);
     expect(queries.join(" ")).not.toMatch(/DELETE/);
     expect(queries.at(-1)).toBe("COMMIT");
   });

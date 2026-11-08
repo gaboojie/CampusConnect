@@ -30,7 +30,7 @@ npm run migrate:prod
 npm run db:reset -- --environment dev
 ```
 
-The reset command is destructive and requires its existing exact confirmation prompt.
+The reset command is destructive to PostgreSQL only and requires its existing exact confirmation prompt. It does not access or delete Cloudflare R2 objects. Listing-management code handles image deletion separately after verifying the authenticated user owns the listing.
 
 ## Entrypoints and validation
 

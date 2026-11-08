@@ -2,14 +2,14 @@ export type PublicUser = {
   userId: number
   username: string
   email: string
-  phoneNumber: string | null
   role: string
   createdAt: string
   creditBalance: number
   creditLastReset: string
   emailNotificationsOn: boolean
-  textNotificationsOn: boolean
   canAddResources: boolean
+  isBanned: boolean
+  profileImageUrl: string | null
 }
 
 // Timestamps from the resource and announcement APIs are campus wall-clock time
@@ -142,7 +142,6 @@ export type AdminUser = {
   userId: number
   username: string
   email: string
-  phoneNumber: string | null
   role: string
   createdAt: string
   emailVerifiedAt: string | null
@@ -150,7 +149,6 @@ export type AdminUser = {
   isBanned: boolean
   canAddResources: boolean
   emailNotificationsOn: boolean
-  textNotificationsOn: boolean
   status: 'active' | 'banned' | 'unverified'
 }
 

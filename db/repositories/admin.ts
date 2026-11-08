@@ -32,7 +32,6 @@ export type AdminUser = {
   userId: number;
   username: string;
   email: string;
-  phoneNumber: string | null;
   role: string;
   createdAt: string;
   emailVerifiedAt: string | null;
@@ -40,7 +39,6 @@ export type AdminUser = {
   isBanned: boolean;
   canAddResources: boolean;
   emailNotificationsOn: boolean;
-  textNotificationsOn: boolean;
   status: string;
 };
 
@@ -142,7 +140,6 @@ type UserRow = {
   user_id: number;
   username: string;
   email: string;
-  phone_number: string | null;
   role: string;
   created_at: string | Date;
   email_verified_at: string | Date | null;
@@ -151,7 +148,6 @@ type UserRow = {
   is_banned: boolean;
   can_add_resources: boolean;
   email_notifications_on: boolean;
-  text_notifications_on: boolean;
   total?: string | number;
 };
 
@@ -160,7 +156,6 @@ function serializeAdminUser(row: UserRow): AdminUser {
     userId: row.user_id,
     username: row.username,
     email: row.email,
-    phoneNumber: row.phone_number,
     role: row.role,
     createdAt: new Date(row.created_at).toISOString(),
     emailVerifiedAt: iso(row.email_verified_at),
@@ -168,15 +163,14 @@ function serializeAdminUser(row: UserRow): AdminUser {
     isBanned: row.is_banned,
     canAddResources: row.can_add_resources,
     emailNotificationsOn: row.email_notifications_on,
-    textNotificationsOn: row.text_notifications_on,
     status: row.is_banned ? "banned" : row.email_verified_at ? "active" : "unverified",
   };
 }
 
 const USER_COLUMNS = `
-  u.user_id, u.username, u.email, u.phone_number, u.role, u.created_at,
+  u.user_id, u.username, u.email, u.role, u.created_at,
   u.email_verified_at, u.credit_balance, u.credit_last_reset, u.is_banned,
-  u.can_add_resources, u.email_notifications_on, u.text_notifications_on
+  u.can_add_resources, u.email_notifications_on
 `;
 
 export async function listUsers(

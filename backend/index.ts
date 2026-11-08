@@ -25,12 +25,16 @@ import {
   createSessionRecord,
   createSignupRecord,
   createVerificationTokenRecord,
+  deleteAccount,
   deleteSession,
   findAuthenticatedUser,
   findLoginUser,
   getPasswordHash,
   healthCheck,
   updatePassword,
+  updateNotificationSettings,
+  updateProfileImage,
+  updateUsername,
   verifyEmailToken,
 } from "../db/repositories/auth";
 import {
@@ -68,6 +72,13 @@ import {
   type Reservation,
   type ServiceResult,
 } from "../db/repositories/reservations";
+import {
+  NotificationWorkflow,
+  repairPendingNotificationWorkflows,
+  startNotificationWorkflows,
+  type NotificationWorkflowBinding,
+} from "./notification-workflow";
+import type { NotificationWorkflowPayload } from "../db/repositories/notifications";
 
 type Bindings = {
   ASSETS: Fetcher;
@@ -77,6 +88,7 @@ type Bindings = {
   PUBLIC_APP_ORIGIN?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
+  NOTIFICATION_WORKFLOW?: Workflow<NotificationWorkflowPayload>;
 };
 
 type AppEnv = {
@@ -89,6 +101,10 @@ type AppEnv = {
 type AppOptions = {
   createDatabaseClient?: DatabaseClientFactory;
   sendVerificationEmail?: VerificationEmailSender;
+  startNotificationWorkflows?: (
+    binding: NotificationWorkflowBinding,
+    notifications: Array<{ notificationId: number; workflowId?: string | null }>,
+  ) => Promise<void>;
 };
 
 type LoginBody = {
@@ -154,6 +170,16 @@ function isUniqueViolation(error: unknown): boolean {
     "code" in error &&
     error.code === "23505"
   );
+}
+
+function isBannedPathAllowed(path: string): boolean {
+  return path === "/api/auth/me" ||
+    path === "/api/auth/delete-account" ||
+    /^\/api\/profile-images\/\d+$/.test(path);
+}
+
+function currentSessionHash(c: Context<AppEnv>): Promise<string> {
+  return hashSessionToken(getCookie(c, SESSION_COOKIE_NAME) ?? "");
 }
 
 async function readJson(c: Context<AppEnv>): Promise<unknown> {
@@ -242,6 +268,7 @@ async function requireAuthentication(
   createDatabaseClient: DatabaseClientFactory,
 ) {
   const token = getCookie(c, SESSION_COOKIE_NAME);
+  const path = new URL(c.req.url).pathname;
 
   if (!token) {
     return c.json({ error: "Authentication required" }, 401);
@@ -263,7 +290,11 @@ async function requireAuthentication(
       return c.json({ error: "Your session has expired. Please log in again." }, 401);
     }
 
-    c.set("user", serializeUser(user));
+    const publicUser = serializeUser(user);
+    c.set("user", publicUser);
+    if (publicUser.isBanned && publicUser.role !== "admin" && !isBannedPathAllowed(path)) {
+      return c.json({ error: "Your account is banned. Only your profile and account deletion are available." }, 403);
+    }
     return next();
   } catch {
     return c.json({ error: "Authentication service unavailable" }, 503);
@@ -295,6 +326,35 @@ export function createApp(options: AppOptions = {}) {
 
   const getEmailSender = (c: Context<AppEnv>): VerificationEmailSender =>
     options.sendVerificationEmail ?? createDefaultVerificationEmailSender(c);
+  const startWorkflows = options.startNotificationWorkflows ?? startNotificationWorkflows;
+
+  const dispatchNotificationWorkflows = async (
+    c: Context<AppEnv>,
+    notificationIds: number[] | undefined,
+  ): Promise<void> => {
+    if (!c.env.NOTIFICATION_WORKFLOW || !notificationIds?.length) return;
+    try {
+      await startWorkflows(
+        c.env.NOTIFICATION_WORKFLOW,
+        notificationIds.map((notificationId) => ({ notificationId })),
+      );
+    } catch (error) {
+      console.error(`Unable to dispatch notification workflows: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const enqueueNotificationWorkflows = (
+    c: Context<AppEnv>,
+    notificationIds: number[] | undefined,
+  ): void => {
+    if (!c.env.NOTIFICATION_WORKFLOW || !notificationIds?.length) return;
+    const dispatch = dispatchNotificationWorkflows(c, notificationIds);
+    if (typeof c.executionCtx?.waitUntil === "function") {
+      c.executionCtx.waitUntil(dispatch);
+    } else {
+      void dispatch;
+    }
+  };
 
   app.get("/api/health", async (c) => {
     if (!c.env.DB) {
@@ -355,9 +415,7 @@ export function createApp(options: AppOptions = {}) {
             username: validation.value.username,
             email: validation.value.email,
             passwordHash,
-            phoneNumber: validation.value.phoneNumber,
             emailNotificationsOn: validation.value.emailNotificationsOn,
-            textNotificationsOn: validation.value.textNotificationsOn,
             verificationTokenHash,
           }),
       );
@@ -459,12 +517,13 @@ export function createApp(options: AppOptions = {}) {
         async (client) => {
           const user = await findLoginUser(client, identifier);
 
-          if (
-            !user ||
-            user.is_banned ||
-            !user.email_verified_at ||
-            !(await verifyPassword(password, user.password_hash))
-          ) {
+          if (!user) {
+            return null;
+          }
+          if (user.is_account_deleted) {
+            return { deleted: true as const };
+          }
+          if (!user.email_verified_at || !(await verifyPassword(password, user.password_hash))) {
             return null;
           }
 
@@ -476,6 +535,9 @@ export function createApp(options: AppOptions = {}) {
         },
       );
 
+      if (result && "deleted" in result) {
+        return c.json({ error: "Your account has been deleted." }, 403);
+      }
       if (!result) {
         return c.json({ error: "Invalid username/email or password." }, 401);
       }
@@ -562,7 +624,131 @@ export function createApp(options: AppOptions = {}) {
     }
   });
 
+  app.patch("/api/profile/username", async (c) => {
+    const body = await readJson(c);
+    const values = body && typeof body === "object" ? body as Record<string, unknown> : {};
+    const username = typeof values.username === "string" ? values.username.trim() : "";
+    if (!/^[A-Za-z0-9_]{3,32}$/.test(username)) {
+      return c.json({ error: "Use 3–32 letters, numbers, or underscores." }, 400);
+    }
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const user = await withDatabase(c.env.DB.connectionString, createDatabaseClient, async (client) => {
+        await updateUsername(client, c.get("user").userId, username);
+        return findAuthenticatedUser(client, await currentSessionHash(c));
+      });
+      if (!user) return c.json({ error: "Your session has expired. Please log in again." }, 401);
+      return c.json({ user: serializeUser(user), message: "Your username has been updated." });
+    } catch (error) {
+      if (isUniqueViolation(error)) return c.json({ error: "That username is already in use." }, 409);
+      return c.json({ error: "Unable to update your username right now." }, 503);
+    }
+  });
+
+  app.patch("/api/profile/notifications", async (c) => {
+    const body = await readJson(c);
+    const values = body && typeof body === "object" ? body as Record<string, unknown> : {};
+    if (typeof values.emailNotificationsOn !== "boolean") {
+      return c.json({ error: "Choose whether email notifications are on or off." }, 400);
+    }
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const user = await withDatabase(c.env.DB.connectionString, createDatabaseClient, async (client) => {
+        await updateNotificationSettings(
+          client,
+          c.get("user").userId,
+          values.emailNotificationsOn as boolean,
+        );
+        return findAuthenticatedUser(client, await currentSessionHash(c));
+      });
+      if (!user) return c.json({ error: "Your session has expired. Please log in again." }, 401);
+      return c.json({ user: serializeUser(user), message: "Notification settings have been updated." });
+    } catch {
+      return c.json({ error: "Unable to update notification settings right now." }, 503);
+    }
+  });
+
+  app.patch("/api/profile/image", async (c) => {
+    let body: Record<string, unknown>;
+    try {
+      body = await c.req.parseBody({ all: true }) as Record<string, unknown>;
+    } catch {
+      body = {};
+    }
+    const image = typeof File !== "undefined" && body.image instanceof File && body.image.size > 0
+      ? body.image
+      : null;
+    const removeImage = body.removeImage === "true" || body.removeImage === true;
+    if (!image && !removeImage) return c.json({ error: "Choose a profile image or remove the current image." }, 400);
+    if (image && !new Set(["image/jpeg", "image/png", "image/webp"]).has(image.type)) {
+      return c.json({ error: "Images must be JPEG, PNG, or WebP files." }, 400);
+    }
+    if (image && image.size > 1024 * 1024) return c.json({ error: "Images must be 1 MB or smaller." }, 400);
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const user = await withDatabase(c.env.DB.connectionString, createDatabaseClient, async (client) => {
+        const result = await updateProfileImage(client, c.env.RESOURCE_IMAGES, c.get("user").userId, image, removeImage);
+        if (!result.ok) return result;
+        const nextUser = await findAuthenticatedUser(client, await currentSessionHash(c));
+        return nextUser ? { ok: true as const, user: nextUser } : { ok: false as const, status: 401 as const, error: "Your session has expired. Please log in again." };
+      });
+      if (!user.ok) return c.json({ error: user.error }, user.status);
+      return c.json({ user: serializeUser(user.user), message: "Your profile image has been updated." });
+    } catch {
+      return c.json({ error: "Unable to update your profile image right now." }, 503);
+    }
+  });
+
+  app.delete("/api/auth/delete-account", async (c) => {
+    const body = await readJson(c);
+    const values = body && typeof body === "object" ? body as Record<string, unknown> : {};
+    const username = typeof values.username === "string" ? values.username.trim() : "";
+    if (!username) return c.json({ error: "Type your username to confirm account deletion." }, 400);
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const deleted = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => deleteAccount(client, c.env.RESOURCE_IMAGES, c.get("user").userId, username),
+      );
+      if (!deleted) return c.json({ error: "The username you entered does not match your account." }, 400);
+      clearSessionCookie(c);
+      return c.body(null, 204);
+    } catch {
+      return c.json({ error: "Unable to delete your account right now." }, 503);
+    }
+  });
+
   app.get("/api/auth/me", (c) => c.json({ user: c.get("user") }));
+
+  app.get("/api/profile-images/:id", async (c) => {
+    const imageId = parsePositiveId(c.req.param("id"));
+    if (imageId === null) return c.notFound();
+    if (!c.env.DB || !c.env.RESOURCE_IMAGES) return c.notFound();
+    try {
+      const metadata = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getImageMetadata(client, imageId),
+      );
+      if (!metadata || !metadata.objectKey.startsWith("users/")) return c.notFound();
+      const object = await c.env.RESOURCE_IMAGES.get(metadata.objectKey);
+      if (!object) return c.notFound();
+      return new Response(object.body, {
+        headers: {
+          "Content-Type": object.httpMetadata?.contentType ?? metadata.contentType,
+          "Content-Disposition": `inline; filename="${metadata.filename.replace(/["\\]/g, "_")}"`,
+          "Cache-Control": "private, max-age=3600",
+        },
+      });
+    } catch {
+      return c.json({ error: "Unable to load this profile image right now." }, 503);
+    }
+  });
 
   app.get("/api/resources", async (c) => {
     const search = parseResourceSearch(new URL(c.req.url).searchParams);
@@ -686,6 +872,7 @@ export function createApp(options: AppOptions = {}) {
         (client) => createListing(client, c.env.RESOURCE_IMAGES, user.userId, parsed.value),
       );
       if (!result.ok) return c.json({ error: result.error }, result.status);
+      enqueueNotificationWorkflows(c, result.notificationIds);
       return c.json({ listing: result.value }, 201);
     } catch {
       return c.json({ error: "Unable to create the listing right now." }, 503);
@@ -706,6 +893,7 @@ export function createApp(options: AppOptions = {}) {
         (client) => updateListing(client, c.env.RESOURCE_IMAGES, c.get("user").userId, resourceId, parsed.value),
       );
       if (!result.ok) return c.json({ error: result.error }, result.status);
+      enqueueNotificationWorkflows(c, result.notificationIds);
       return c.json({ listing: result.value });
     } catch {
       return c.json({ error: "Unable to update the listing right now." }, 503);
@@ -724,6 +912,7 @@ export function createApp(options: AppOptions = {}) {
         (client) => deleteListing(client, c.env.RESOURCE_IMAGES, c.get("user").userId, resourceId),
       );
       if (!result.ok) return c.json({ error: result.error }, result.status);
+      enqueueNotificationWorkflows(c, result.notificationIds);
       return c.body(null, 204);
     } catch {
       return c.json({ error: "Unable to delete the listing right now." }, 503);
@@ -793,6 +982,7 @@ export function createApp(options: AppOptions = {}) {
       if (!result.ok) {
         return c.json({ error: result.error }, result.status);
       }
+      enqueueNotificationWorkflows(c, result.notificationIds);
       return c.json({ reservation: result.value }, successStatus);
     } catch {
       return c.json({ error: "Unable to save the reservation right now." }, 503);
@@ -961,6 +1151,18 @@ export function createApp(options: AppOptions = {}) {
   return app;
 }
 
+async function scheduled(controller: ScheduledController, env: Bindings): Promise<void> {
+  if (controller.cron !== "*/15 * * * *") return;
+
+  try {
+    await repairPendingNotificationWorkflows(env, env.NOTIFICATION_WORKFLOW);
+  } catch (error) {
+    console.error(`Notification repair sweep failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw error;
+  }
+}
+
 const app = createApp();
 
-export default app;
+export { NotificationWorkflow };
+export default Object.assign(app, { scheduled });

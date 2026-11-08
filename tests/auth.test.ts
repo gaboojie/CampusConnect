@@ -62,12 +62,10 @@ class FakeClient implements DatabaseClient {
     }
 
     if (query.startsWith("INSERT INTO \"User\"")) {
-      const [username, email, passwordHash, phoneNumber, emailNotificationsOn, textNotificationsOn] = values as [
+      const [username, email, passwordHash, emailNotificationsOn] = values as [
         string,
         string,
         string,
-        string | null,
-        boolean,
         boolean,
       ];
 
@@ -87,13 +85,11 @@ class FakeClient implements DatabaseClient {
         username,
         email,
         password_hash: passwordHash,
-        phone_number: phoneNumber,
         role: "student",
         created_at: createdAt,
         credit_balance: 20,
         credit_last_reset: createdAt,
         email_notifications_on: emailNotificationsOn,
-        text_notifications_on: textNotificationsOn,
         can_add_resources: true,
         email_verified_at: null,
         is_banned: false,
@@ -208,9 +204,7 @@ function validSignup(overrides: Partial<SignupInput> = {}): SignupInput {
     email: "maya.r@vt.edu",
     password: "correct horse battery staple",
     confirmPassword: "correct horse battery staple",
-    phoneNumber: null,
     emailNotificationsOn: true,
-    textNotificationsOn: false,
     ...overrides,
   };
 }
@@ -580,13 +574,11 @@ describe("authentication routes", () => {
       username: "banned_user",
       email: "banned@vt.edu",
       password_hash: passwordHash,
-      phone_number: null,
       role: "student",
       created_at: new Date(),
       credit_balance: 20,
       credit_last_reset: new Date(),
       email_notifications_on: true,
-      text_notifications_on: false,
       can_add_resources: false,
         email_verified_at: null,
       is_banned: true,

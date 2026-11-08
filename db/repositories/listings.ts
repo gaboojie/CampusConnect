@@ -13,6 +13,10 @@ import {
   type ResourceSummary,
   type Validation,
 } from "./resources";
+import {
+  createReservationCancellationNotification,
+  skipPendingReservationReminders,
+} from "./notifications";
 
 const MAX_IMAGE_BYTES = 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -45,7 +49,7 @@ export type ListingDetails = ResourceDetails & {
 };
 
 export type ListingResult<T> =
-  | { ok: true; value: T }
+  | { ok: true; value: T; notificationIds?: number[] }
   | { ok: false; status: 400 | 403 | 404 | 409 | 503; error: string };
 
 function fail<T>(status: 400 | 403 | 404 | 409 | 503, error: string): ListingResult<T> {
@@ -476,7 +480,7 @@ async function cancelAffectedReservations(
   resourceId: number,
   resourceName: string,
   requiredCredits: number,
-): Promise<number> {
+): Promise<number[]> {
   const affected = await client.query<AffectedReservation>(
     `
       SELECT
@@ -495,13 +499,14 @@ async function cancelAffectedReservations(
     [resourceId],
   );
 
-  if (affected.rows.length === 0) return 0;
+  if (affected.rows.length === 0) return [];
   const userIds = [...new Set(affected.rows.map((row) => row.user_id))];
   await client.query(
     `SELECT user_id FROM "User" WHERE user_id = ANY($1::integer[]) ORDER BY user_id FOR UPDATE`,
     [userIds],
   );
 
+  const notificationIds: number[] = [];
   for (const reservation of affected.rows) {
     await client.query(
       `UPDATE "Reservation" SET status = 'cancelled' WHERE reservation_id = $1 AND status = 'confirmed'`,
@@ -515,18 +520,18 @@ async function cancelAffectedReservations(
       `INSERT INTO "CreditTransaction" (user_id, amount, transaction_type) VALUES ($1, $2, 'refund')`,
       [reservation.user_id, requiredCredits],
     );
-    await client.query(
-      `
-        INSERT INTO "Notification" (user_id, message, notification_type)
-        VALUES ($1, $2, 'reservation_cancelled')
-      `,
-      [
-        reservation.user_id,
-        `Your reservation for ${resourceName} on ${reservation.start_time}–${reservation.end_time} was cancelled because the resource availability changed. ${requiredCredits} credits were refunded.`,
-      ],
+    await skipPendingReservationReminders(
+      client,
+      reservation.reservation_id,
+      "Reservation was cancelled because the resource availability changed.",
     );
+    notificationIds.push(await createReservationCancellationNotification(client, {
+      userId: reservation.user_id,
+      reservationId: reservation.reservation_id,
+      message: `Your reservation for ${resourceName} on ${reservation.start_time}–${reservation.end_time} was cancelled because the resource availability changed. ${requiredCredits} credits were refunded.`,
+    }));
   }
-  return affected.rows.length;
+  return notificationIds;
 }
 
 export async function listOwnedResources(client: DatabaseClient, ownerId: number): Promise<ListingSummary[]> {
@@ -709,6 +714,7 @@ export async function updateListing(
 ): Promise<ListingResult<ListingDetails>> {
   let uploadedKey: string | null = null;
   let oldObjectKey: string | null = null;
+  let notificationIds: number[] = [];
   let committed = false;
   await client.query("BEGIN");
   try {
@@ -736,7 +742,12 @@ export async function updateListing(
         await client.query("ROLLBACK");
         return fail(400, availabilityError);
       }
-      await cancelAffectedReservations(client, resourceId, input.name, owned.value.requiredCredits);
+      notificationIds = await cancelAffectedReservations(
+        client,
+        resourceId,
+        input.name,
+        owned.value.requiredCredits,
+      );
     }
 
     await client.query(
@@ -773,7 +784,9 @@ export async function updateListing(
     await client.query("COMMIT");
     committed = true;
     await bestEffortDelete(bucket, oldObjectKey);
-    return getOwnedResource(client, resourceId, ownerId);
+    const details = await getOwnedResource(client, resourceId, ownerId);
+    if (!details.ok || notificationIds.length === 0) return details;
+    return { ...details, notificationIds };
   } catch {
     if (!committed) await client.query("ROLLBACK");
     await bestEffortDelete(bucket, uploadedKey);

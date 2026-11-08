@@ -29,9 +29,7 @@
   let signupEmail = ''
   let signupPassword = ''
   let signupConfirmPassword = ''
-  let signupPhoneNumber = ''
   let signupEmailNotifications = true
-  let signupTextNotifications = false
   let resendEmail = ''
 
   function clearFeedback() {
@@ -140,9 +138,7 @@
           email: signupEmail,
           password: signupPassword,
           confirmPassword: signupConfirmPassword,
-          phoneNumber: signupPhoneNumber,
           emailNotificationsOn: signupEmailNotifications,
-          textNotificationsOn: signupTextNotifications,
         }),
       })
       const payload = await responsePayload(response)
@@ -243,6 +239,16 @@
     }
   }
 
+  function handleUserUpdated(updatedUser: PublicUser) {
+    user = updatedUser
+  }
+
+  function handleAccountDeleted() {
+    user = null
+    clearAppRouteHash()
+    message = 'Your account has been deleted.'
+  }
+
   onMount(() => {
     verificationToken = readVerificationToken()
     return loadCurrentUser()
@@ -289,7 +295,7 @@
       {#if onAdminPath}
         <AdminLayout {user} />
       {:else}
-        <AppLayout {user} {submitting} onLogout={logout} />
+        <AppLayout {user} {submitting} onLogout={logout} onAccountDeleted={handleAccountDeleted} onUserUpdated={handleUserUpdated} />
       {/if}
     {:else if verificationToken}
       <section class="panel verification-card">
@@ -392,22 +398,13 @@
           <input type="password" bind:value={signupConfirmPassword} autocomplete="new-password" required />
           {#if fieldErrors.confirmPassword}<span class="field-error">{fieldErrors.confirmPassword}</span>{/if}
         </label>
-        <label>
-          Phone number <span class="optional">optional</span>
-          <input type="tel" bind:value={signupPhoneNumber} autocomplete="tel" maxlength="16" />
-          {#if fieldErrors.phoneNumber}<span class="field-error">{fieldErrors.phoneNumber}</span>{/if}
-        </label>
-
         <fieldset class="notification-options">
           <legend>Notifications</legend>
-          <p class="checkbox-help">Choose how you would like to hear about reservations and important account updates.</p>
-          <label class="checkbox-label">
-            <input type="checkbox" bind:checked={signupEmailNotifications} />
+          <p class="checkbox-help">Choose whether you would like to receive reservation and account updates by email.</p>
+          <label class="toggle-label">
+            <input class="toggle-input" type="checkbox" bind:checked={signupEmailNotifications} />
+            <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
             <span>Email notifications</span>
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" bind:checked={signupTextNotifications} disabled={!signupPhoneNumber.trim()} />
-            <span>SMS notifications <span class="optional">requires a phone number</span></span>
           </label>
         </fieldset>
 
