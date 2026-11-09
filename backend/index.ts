@@ -54,6 +54,7 @@ import {
   updateListing,
 } from "../db/repositories/listings";
 import { getAnnouncements, parseAnnouncementQuery } from "../db/repositories/announcements";
+import { getMyAnalytics } from "../db/repositories/analytics";
 import {
   getStats,
   getUserDetail,
@@ -1048,6 +1049,24 @@ export function createApp(options: AppOptions = {}) {
     return runReservationWrite(c, 200, (client) =>
       cancelReservation(client, userId, reservationId),
     );
+  });
+
+  // Analytics for the session user only; the route takes no user id.
+  app.get("/api/analytics/me", async (c) => {
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const analytics = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getMyAnalytics(client, c.get("user").userId),
+      );
+      return c.json({ analytics });
+    } catch {
+      return c.json({ error: "Unable to load your activity right now." }, 503);
+    }
   });
 
   app.get("/api/admin/stats", async (c) => {

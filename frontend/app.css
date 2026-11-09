@@ -2348,3 +2348,220 @@ a.resource-card:hover {
   color: #630031;
   font-weight: 650;
 }
+
+/* My Activity */
+
+.activity-page {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.stat-card-static:hover {
+  border-color: #e2e5e9;
+}
+
+.stat-detail {
+  font-size: 0.8rem;
+}
+
+.activity-stats {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.activity-stats .stat-value {
+  font-size: 1.9rem;
+}
+
+.activity-panel {
+  margin-bottom: 1rem;
+  box-shadow: none;
+}
+
+.activity-panel h3 {
+  margin-bottom: 0.25rem;
+}
+
+.activity-panel-note {
+  margin: 0 0 1.25rem;
+  font-size: 0.88rem;
+}
+
+.activity-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.activity-columns .activity-panel {
+  margin-bottom: 0;
+}
+
+.activity-table-heading {
+  margin-top: 1.5rem;
+}
+
+.chart-note {
+  margin: 1rem 0 0;
+  font-size: 0.82rem;
+}
+
+.month-chart {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: clamp(0.4rem, 2vw, 1.25rem);
+  align-items: end;
+}
+
+.month-column {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+}
+
+.month-total {
+  color: #172033;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.month-track {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  height: 180px;
+  border-bottom: 1px solid #e2e5e9;
+}
+
+.month-bar {
+  display: flex;
+  flex-direction: column-reverse;
+  width: min(100%, 56px);
+  min-height: 0;
+  border-radius: 6px 6px 0 0;
+  overflow: hidden;
+}
+
+.month-segment {
+  flex-basis: 0;
+  min-height: 2px;
+}
+
+.month-label {
+  display: grid;
+  justify-items: center;
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.month-label .muted {
+  font-size: 0.72rem;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.82rem;
+}
+
+.chart-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.chart-swatch {
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 3px;
+}
+
+.chart-legend-detailed {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.chart-legend-detailed li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  column-gap: 0.5rem;
+}
+
+.chart-legend-detailed .chart-legend-label {
+  font-weight: 650;
+}
+
+.chart-legend-value {
+  font-weight: 700;
+  text-align: right;
+}
+
+.chart-legend-description {
+  grid-column: 2 / -1;
+  font-size: 0.76rem;
+}
+
+.outcome-bar {
+  display: flex;
+  gap: 2px;
+  height: 18px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #eef0f3;
+}
+
+.outcome-segment {
+  flex-basis: 0;
+  min-width: 4px;
+}
+
+.bar-list {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bar-list-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.88rem;
+}
+
+.bar-list-label {
+  font-weight: 650;
+}
+
+.bar-list-value {
+  flex: none;
+  font-weight: 700;
+}
+
+.bar-list-track {
+  height: 10px;
+  border-radius: 999px;
+  background: #f4e9ee;
+}
+
+.bar-list-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #630031;
+}
+
+@media (max-width: 600px) {
+  .month-track {
+    height: 140px;
+  }
+}
