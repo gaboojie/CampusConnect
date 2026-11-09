@@ -3,12 +3,14 @@
   import { getJson, isAbortError, sendJson } from '../../lib/api'
   import { formatClock, formatDate, formatDateTime, formatDuration, formatRating } from '../../lib/format'
   import { routeHash } from '../../lib/routes'
-  import type { ResourceDetails, SlotInput } from '../../lib/types'
+  import type { CreditSummary, PublicUser, ResourceDetails, ReservationWriteResponse, SlotInput } from '../../lib/types'
   import ReservationForm from '../reservations/ReservationForm.svelte'
 
   export let resourceId: string
   // The results page's filter query, kept so "Back to results" restores it.
   export let backQuery: string
+  export let user: PublicUser
+  export let onUserUpdated: (user: PublicUser) => void
 
   let resource: ResourceDetails | null = null
   let loading = true
@@ -19,6 +21,23 @@
   $: backHref = `#/resources${backQuery ? `?${backQuery}` : ''}`
   $: image = resource?.images[0] ?? null
   $: void load(resourceId)
+  $: cost = resource?.requiredCredits ?? 0
+  $: affordable = user.creditBalance >= cost
+
+  // The signed-in user object is loaded at login; read the current balance so
+  // the cost check is not based on a stale value. Failures keep the old value.
+  async function refreshBalance(signal: AbortSignal) {
+    try {
+      const { summary } = await getJson<{ summary: CreditSummary }>('/api/credits', signal)
+      if (summary.balance !== user.creditBalance) onUserUpdated({ ...user, creditBalance: summary.balance })
+    } catch {
+      // The server still enforces the balance when booking.
+    }
+  }
+
+  function credits(count: number): string {
+    return `${count} credit${count === 1 ? '' : 's'}`
+  }
 
   async function load(id: string) {
     controller?.abort()
@@ -33,6 +52,7 @@
         request.signal,
       )
       resource = payload.resource
+      void refreshBalance(request.signal)
     } catch (caught) {
       if (isAbortError(caught)) return
       resource = null
@@ -54,7 +74,11 @@
 
   async function reserve(slot: SlotInput) {
     if (!resource) return
-    await sendJson('POST', '/api/reservations', { resourceId: resource.id, ...slot })
+    const response = await sendJson<ReservationWriteResponse>('POST', '/api/reservations', {
+      resourceId: resource.id,
+      ...slot,
+    })
+    if (response.credits) onUserUpdated({ ...user, creditBalance: response.credits.balance })
     reserving = false
     window.location.hash = routeHash('reservations')
   }
@@ -100,7 +124,14 @@
           </p>
 
           <div class="reserve-box">
-            <button type="button" on:click={() => (reserving = true)}>Reserve</button>
+            <button type="button" on:click={() => (reserving = true)} disabled={!affordable}>Reserve</button>
+            <p class="muted">
+              Costs {credits(cost)} per booking · You have {credits(user.creditBalance)}.
+              <a class="text-link" href="#/credits">My credits</a>
+            </p>
+            {#if !affordable}
+              <p class="credit-note credit-note-warning">You don't have enough credits to book this resource.</p>
+            {/if}
           </div>
         </div>
       </div>
@@ -225,6 +256,8 @@
         submitLabel="Reserve"
         initial={initialSlot()}
         maxMinutes={resource.maxReservationMinutes ?? 240}
+        note={`This booking costs ${credits(cost)}. You have ${credits(user.creditBalance)}, so ${credits(Math.max(0, user.creditBalance - cost))} will remain. Cancel at least 24 hours ahead for a full refund.`}
+        noteWarning={!affordable}
         onSubmit={reserve}
         onClose={() => (reserving = false)}
       />

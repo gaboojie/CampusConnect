@@ -17,6 +17,7 @@ import {
   createReservationCancellationNotification,
   skipPendingReservationReminders,
 } from "./notifications";
+import { refundReservationCharge, refundSentence } from "./credits";
 
 const MAX_IMAGE_BYTES = 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -475,11 +476,13 @@ type AffectedReservation = {
   end_time: string;
 };
 
-async function cancelAffectedReservations(
+// System-caused cancellations are always refunded, but only by the amount of the
+// charge that pairs with the reservation. Bookings that were never charged get
+// no refund. Called with the resource row already locked.
+export async function cancelAffectedReservations(
   client: DatabaseClient,
   resourceId: number,
   resourceName: string,
-  requiredCredits: number,
 ): Promise<number[]> {
   const affected = await client.query<AffectedReservation>(
     `
@@ -508,18 +511,17 @@ async function cancelAffectedReservations(
 
   const notificationIds: number[] = [];
   for (const reservation of affected.rows) {
-    await client.query(
+    const cancelled = await client.query(
       `UPDATE "Reservation" SET status = 'cancelled' WHERE reservation_id = $1 AND status = 'confirmed'`,
       [reservation.reservation_id],
     );
-    await client.query(
-      `UPDATE "User" SET credit_balance = credit_balance + $2 WHERE user_id = $1`,
-      [reservation.user_id, requiredCredits],
-    );
-    await client.query(
-      `INSERT INTO "CreditTransaction" (user_id, amount, transaction_type) VALUES ($1, $2, 'refund')`,
-      [reservation.user_id, requiredCredits],
-    );
+    // Only the transaction that moved the reservation out of 'confirmed' may refund it.
+    if (cancelled.rowCount !== 1) continue;
+
+    const outcome = await refundReservationCharge(client, {
+      userId: reservation.user_id,
+      reservationId: reservation.reservation_id,
+    });
     await skipPendingReservationReminders(
       client,
       reservation.reservation_id,
@@ -528,7 +530,7 @@ async function cancelAffectedReservations(
     notificationIds.push(await createReservationCancellationNotification(client, {
       userId: reservation.user_id,
       reservationId: reservation.reservation_id,
-      message: `Your reservation for ${resourceName} on ${reservation.start_time}–${reservation.end_time} was cancelled because the resource availability changed. ${requiredCredits} credits were refunded.`,
+      message: `Your reservation for ${resourceName} on ${reservation.start_time}–${reservation.end_time} was cancelled because the resource availability changed. ${refundSentence(outcome)}`,
     }));
   }
   return notificationIds;
@@ -742,12 +744,7 @@ export async function updateListing(
         await client.query("ROLLBACK");
         return fail(400, availabilityError);
       }
-      notificationIds = await cancelAffectedReservations(
-        client,
-        resourceId,
-        input.name,
-        owned.value.requiredCredits,
-      );
+      notificationIds = await cancelAffectedReservations(client, resourceId, input.name);
     }
 
     await client.query(

@@ -113,6 +113,63 @@ export type Reservation = {
   createdAt: string
   // Confirmed and not started yet, so the time can be changed or it can be cancelled.
   canModify: boolean
+  // Credits paid for this booking; null when no charge could be matched to it
+  // (for example, bookings made before credits were charged).
+  creditsCharged: number | null
+  // Cancelling now (at least 24 hours before the start) returns creditsCharged.
+  refundEligible: boolean
+}
+
+export type RefundStatus = 'refunded' | 'late' | 'not_charged' | 'unverified'
+
+// Credit movement reported by a booking or cancellation request.
+export type CreditChange = {
+  charged: number
+  refunded: number
+  balance: number
+  refundStatus?: RefundStatus
+}
+
+export type ReservationWriteResponse = {
+  reservation: Reservation
+  credits?: CreditChange
+}
+
+export type CreditSummary = {
+  balance: number
+  creditLastReset: string
+  spent: number
+  refunded: number
+  granted: number
+  received: number
+  transactionCount: number
+  // The history adds up to the balance, so the running balance column is reliable.
+  historyMatchesBalance: boolean
+}
+
+export type CreditFilter = 'all' | 'charges' | 'refunds' | 'grants'
+
+export type CreditTransaction = {
+  id: number
+  // 'initial_grant' | 'reservation_charge' | 'refund' | 'monthly_reset'
+  type: string
+  amount: number
+  createdAt: string
+  balanceAfter: number
+  reservation: {
+    id: number
+    resource: NamedOption
+    building: { name: string }
+    startTime: string
+    endTime: string
+  } | null
+}
+
+export type CreditTransactionPage = {
+  items: CreditTransaction[]
+  total: number
+  page: number
+  pageSize: number
 }
 
 export type MyReservationsResponse = {

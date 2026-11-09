@@ -73,6 +73,11 @@ import {
   type ServiceResult,
 } from "../db/repositories/reservations";
 import {
+  getCreditSummary,
+  listCreditTransactions,
+  parseCreditTransactionQuery,
+} from "../db/repositories/credits";
+import {
   NotificationWorkflow,
   repairPendingNotificationWorkflows,
   startNotificationWorkflows,
@@ -983,7 +988,10 @@ export function createApp(options: AppOptions = {}) {
         return c.json({ error: result.error }, result.status);
       }
       enqueueNotificationWorkflows(c, result.notificationIds);
-      return c.json({ reservation: result.value }, successStatus);
+      return c.json(
+        result.credits ? { reservation: result.value, credits: result.credits } : { reservation: result.value },
+        successStatus,
+      );
     } catch {
       return c.json({ error: "Unable to save the reservation right now." }, 503);
     }
@@ -1048,6 +1056,49 @@ export function createApp(options: AppOptions = {}) {
     return runReservationWrite(c, 200, (client) =>
       cancelReservation(client, userId, reservationId),
     );
+  });
+
+  // Credits: always scoped to the session user; no endpoint accepts a user id.
+  app.get("/api/credits", async (c) => {
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const summary = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getCreditSummary(client, c.get("user").userId),
+      );
+      if (!summary) {
+        return c.json({ error: "Account not found." }, 404);
+      }
+      return c.json({ summary });
+    } catch {
+      return c.json({ error: "Unable to load your credits right now." }, 503);
+    }
+  });
+
+  app.get("/api/credits/transactions", async (c) => {
+    const query = parseCreditTransactionQuery(new URL(c.req.url).searchParams);
+
+    if (!query.ok) {
+      return c.json({ error: query.error }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const page = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => listCreditTransactions(client, c.get("user").userId, query.value),
+      );
+      return c.json(page);
+    } catch {
+      return c.json({ error: "Unable to load your credit history right now." }, 503);
+    }
   });
 
   app.get("/api/admin/stats", async (c) => {

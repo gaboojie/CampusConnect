@@ -2348,3 +2348,71 @@ a.resource-card:hover {
   color: #630031;
   font-weight: 650;
 }
+
+/* My Credits */
+.credits-page {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.credit-stats .stat-card:hover {
+  border-color: #e2e5e9;
+}
+
+.credit-rules {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 1.25rem;
+  box-shadow: none;
+}
+
+.credit-rules p {
+  margin: 0;
+}
+
+.credit-table td:nth-child(2) {
+  white-space: normal;
+  min-width: 16rem;
+}
+
+.credit-activity {
+  display: grid;
+  gap: 0.1rem;
+  margin-top: 0.35rem;
+}
+
+.credit-number {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.credit-plus {
+  color: #155b41;
+  font-weight: 700;
+}
+
+.credit-minus {
+  color: #a13232;
+  font-weight: 700;
+}
+
+.credit-type-reservation_charge {
+  color: #a13232;
+  background: #fbe9e9;
+}
+
+.credit-type-refund,
+.credit-type-initial_grant,
+.credit-type-monthly_reset {
+  color: #155b41;
+  background: #e4f5ed;
+}
+
+.credit-note {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.credit-note-warning {
+  color: #7a4a00;
+}

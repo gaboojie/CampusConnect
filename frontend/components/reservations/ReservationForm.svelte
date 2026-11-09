@@ -8,6 +8,9 @@
   export let submitLabel: string
   export let initial: SlotInput
   export let maxMinutes: number | null = null
+  // Optional extra line, e.g. the booking's credit cost.
+  export let note = ''
+  export let noteWarning = false
   // Rejects with an Error whose message is shown in the form.
   export let onSubmit: (slot: SlotInput) => Promise<void>
   export let onClose: () => void
@@ -81,6 +84,9 @@
         Times are campus time (Eastern).
         {#if maxMinutes}Bookings can be up to {formatDuration(maxMinutes)}.{/if}
       </p>
+      {#if note}
+        <p class="credit-note" class:credit-note-warning={noteWarning}>{note}</p>
+      {/if}
 
       {#if localError}
         <p class="field-error" role="status">{localError}</p>
