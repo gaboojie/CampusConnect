@@ -97,6 +97,38 @@ export type ListingDetails = ResourceDetails & {
   availability: AvailabilitySlot[]
 }
 
+export type OwnerReservationReview = {
+  reservationId: number
+  reserver: { id: number; username: string }
+  startTime: string
+  endTime: string
+  review: {
+    rating: number
+    reason: string | null
+    createdAt: string
+    isAnonymous: boolean
+  } | null
+}
+
+export type UserReviewItem = {
+  id: number
+  reservationId: number
+  rating: number
+  reason: string | null
+  createdAt: string
+  resource: { id: number; name: string }
+  reviewer: { id: number; username: string } | null
+}
+
+export type UserReviewPage = {
+  profile: { id: number; username: string }
+  items: UserReviewItem[]
+  total: number
+  page: number
+  pageSize: number
+  averageRating: number | null
+}
+
 export type ListingFormOptions = {
   categories: NamedOption[]
   buildings: NamedOption[]

@@ -56,6 +56,13 @@ import {
 import { getAnnouncements, parseAnnouncementQuery } from "../db/repositories/announcements";
 import { getMyAnalytics } from "../db/repositories/analytics";
 import {
+  createReservationReview,
+  listOwnerReservationReviews,
+  listUserReservationReviews,
+  parseReservationReviewInput,
+  parseReviewPageQuery,
+} from "../db/repositories/reservationReviews";
+import {
   getStats,
   getUserDetail,
   listReservations,
@@ -756,6 +763,27 @@ export function createApp(options: AppOptions = {}) {
     }
   });
 
+  app.get("/api/users/:id/reviews", async (c) => {
+    const userId = parsePositiveId(c.req.param("id"));
+    if (userId === null) return c.json({ error: "User id must be a positive whole number." }, 400);
+
+    const query = parseReviewPageQuery(new URL(c.req.url).searchParams);
+    if (!query.ok) return c.json({ error: query.error }, 400);
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const reviews = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => listUserReservationReviews(client, userId, query.value),
+      );
+      if (!reviews) return c.json({ error: "User not found." }, 404);
+      return c.json(reviews);
+    } catch {
+      return c.json({ error: "Unable to load user reviews right now." }, 503);
+    }
+  });
+
   app.get("/api/resources", async (c) => {
     const search = parseResourceSearch(new URL(c.req.url).searchParams);
 
@@ -852,6 +880,45 @@ export function createApp(options: AppOptions = {}) {
       return c.json({ listing: result.value });
     } catch {
       return c.json({ error: "Unable to load this listing right now." }, 503);
+    }
+  });
+
+  app.get("/api/listings/:id/reservation-reviews", async (c) => {
+    const resourceId = parsePositiveId(c.req.param("id"));
+    if (resourceId === null) return c.json({ error: "Listing id must be a positive whole number." }, 400);
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => listOwnerReservationReviews(client, resourceId, c.get("user").userId),
+      );
+      if (!result.ok) return c.json({ error: result.error }, result.status);
+      return c.json({ reservations: result.value });
+    } catch {
+      return c.json({ error: "Unable to load reservation reviews right now." }, 503);
+    }
+  });
+
+  app.post("/api/listings/:id/reservation-reviews", async (c) => {
+    const resourceId = parsePositiveId(c.req.param("id"));
+    if (resourceId === null) return c.json({ error: "Listing id must be a positive whole number." }, 400);
+
+    const input = parseReservationReviewInput(await readJson(c));
+    if (!input.ok) return c.json({ error: input.error }, 400);
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => createReservationReview(client, resourceId, c.get("user").userId, input.value),
+      );
+      if (!result.ok) return c.json({ error: result.error }, result.status);
+      return c.json({ reservation: result.value }, 201);
+    } catch {
+      return c.json({ error: "Unable to save this reservation review right now." }, 503);
     }
   });
 

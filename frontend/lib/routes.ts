@@ -1,4 +1,4 @@
-export type RouteId = 'profile' | 'resources' | 'reservations' | 'credits' | 'activity' | 'listings' | 'notifications' | 'announcements'
+export type RouteId = 'profile' | 'users' | 'resources' | 'reservations' | 'credits' | 'activity' | 'listings' | 'notifications' | 'announcements'
 
 export type AppRoute = {
   id: RouteId
@@ -6,6 +6,7 @@ export type AppRoute = {
   description: string
   // Stroke-only SVG path data drawn in a 24×24 viewBox.
   icon: string[]
+  hidden?: boolean
 }
 
 export const routes: AppRoute[] = [
@@ -17,6 +18,13 @@ export const routes: AppRoute[] = [
       'M12 4.75a3.25 3.25 0 1 1 0 6.5a3.25 3.25 0 1 1 0-6.5Z',
       'M5.5 20c.7-3.7 2.9-5.5 6.5-5.5s5.8 1.8 6.5 5.5',
     ],
+  },
+  {
+    id: 'users',
+    label: 'User Profile',
+    description: 'View a CampusConnect user profile and their reservation reviews.',
+    icon: [],
+    hidden: true,
   },
   {
     id: 'resources',
@@ -82,7 +90,7 @@ export type AppLocation = {
 }
 
 // Routes that accept a numeric second segment.
-const ROUTES_WITH_ID: RouteId[] = ['resources', 'listings']
+const ROUTES_WITH_ID: RouteId[] = ['resources', 'listings', 'users']
 
 // Only "#/<id>" hashes are routes, so other hashes such as "#verify=<token>" are left alone.
 export function parseLocation(hash: string): AppLocation {
@@ -93,7 +101,10 @@ export function parseLocation(hash: string): AppLocation {
     return { route: DEFAULT_ROUTE, subpath: null, query: '' }
   }
 
-  const subpath = match[2] && ROUTES_WITH_ID.includes(route.id) && /^\d+$/.test(match[2]) ? match[2] : null
+  const subpath = match[2] && ROUTES_WITH_ID.includes(route.id) && /^[1-9]\d*$/.test(match[2]) ? match[2] : null
+  if (route.id === 'users' && subpath === null) {
+    return { route: DEFAULT_ROUTE, subpath: null, query: '' }
+  }
   return { route, subpath, query: match[3] ?? '' }
 }
 

@@ -11,6 +11,7 @@
   import ReservationsSection from './sections/ReservationsSection.svelte'
   import ResourceDetailSection from './sections/ResourceDetailSection.svelte'
   import ResourcesSection from './sections/ResourcesSection.svelte'
+  import UserProfileSection from './sections/UserProfileSection.svelte'
   import { DEFAULT_ROUTE, locationHash, parseLocation, routes, type AppLocation } from '../lib/routes'
   import type { PublicUser } from '../lib/types'
 
@@ -73,7 +74,9 @@
   onMount(syncRoute)
 
   $: route = user.isBanned ? routes[0] : location.route
-  $: visibleRoutes = user.isBanned ? routes.filter((candidate) => candidate.id === 'profile') : routes
+  $: visibleRoutes = user.isBanned
+    ? routes.filter((candidate) => candidate.id === 'profile')
+    : routes.filter((candidate) => !candidate.hidden)
 </script>
 
 <svelte:window on:hashchange={syncRoute} on:keydown={handleKeydown} />
@@ -104,6 +107,8 @@
 
     {#if user.isBanned || route.id === 'profile'}
       <ProfileSection {user} {submitting} {onLogout} {onAccountDeleted} {onUserUpdated} />
+    {:else if route.id === 'users' && location.subpath}
+      <UserProfileSection userId={location.subpath} />
     {:else if route.id === 'resources' && location.subpath}
       <ResourceDetailSection resourceId={location.subpath} backQuery={location.query} {user} {onUserUpdated} />
     {:else if route.id === 'resources'}

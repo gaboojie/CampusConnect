@@ -1,6 +1,7 @@
 <script lang="ts">
   import { sendForm, sendJson } from '../../lib/api'
   import type { PublicUser } from '../../lib/types'
+  import UserReviewsSection from './UserReviewsSection.svelte'
 
   export let user: PublicUser
   export let submitting: boolean
@@ -221,7 +222,7 @@
     <div class="profile-detail-row"><dt>Username</dt>{#if editing === 'username'}<dd class="profile-edit-value"><input bind:value={usernameDraft} minlength="3" maxlength="32" autocomplete="username" /><span class="profile-edit-actions"><button type="button" class="compact-button" on:click={saveUsername} disabled={saving}>Save</button><button type="button" class="secondary-button compact-button" on:click={cancelEditing} disabled={saving}>Cancel</button></span></dd>{:else}<dd>{user.username}</dd>{/if}{#if (!user.isBanned || user.role === 'admin') && editing !== 'username'}<button type="button" class="icon-button detail-edit" aria-label="Edit username" title="Edit username" on:click={() => startEditing('username')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16.5-.75 3.75L7 19.5 18.25 8.25a2.12 2.12 0 0 0-3-3L4 16.5Z" /><path d="m13.75 6.75 3.5 3.5" /></svg></button>{/if}</div>
     <div><dt>Email</dt><dd>{user.email}</dd></div>
     <div><dt>Account type</dt><dd>{accountTypeLabel(user.role)}</dd></div>
-    <div><dt>Credits</dt><dd>{user.creditBalance}{#if !user.isBanned} · <a class="text-link" href="#/credits">View history</a>{/if}</dd></div>
+    <div><dt>Credits</dt><dd>{user.creditBalance}{#if !user.isBanned}{' · '}<a class="text-link" href="#/credits">View history</a>{/if}</dd></div>
     <div><dt>Joined</dt><dd>{new Date(user.createdAt).toLocaleDateString()}</dd></div>
     <div class="profile-detail-row"><dt>Email notifications</dt>{#if editing === 'emailNotifications'}<dd class="profile-edit-value"><label class="toggle-label"><input class="toggle-input" type="checkbox" bind:checked={emailNotificationsDraft} /><span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span><span>Receive email notifications</span></label><span class="profile-edit-actions"><button type="button" class="compact-button" on:click={saveNotifications} disabled={saving}>Save</button><button type="button" class="secondary-button compact-button" on:click={cancelEditing} disabled={saving}>Cancel</button></span></dd>{:else}<dd>{user.emailNotificationsOn ? 'On' : 'Off'}</dd>{/if}{#if (!user.isBanned || user.role === 'admin') && editing !== 'emailNotifications'}<button type="button" class="icon-button detail-edit" aria-label="Edit email notifications" title="Edit email notifications" on:click={() => startEditing('emailNotifications')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16.5-.75 3.75L7 19.5 18.25 8.25a2.12 2.12 0 0 0-3-3L4 16.5Z" /><path d="m13.75 6.75 3.5 3.5" /></svg></button>{/if}</div>
   </dl>
@@ -231,6 +232,8 @@
   {/if}
 
   <div class="account-danger-zone"><div><h3>Delete account</h3><p class="muted">Permanently remove your CampusConnect account and personal profile data.</p></div><button type="button" class="danger-button" on:click={openDelete}>Delete account</button></div>
+
+  <UserReviewsSection userId={String(user.userId)} />
 </section>
 
 {#if deleteOpen}

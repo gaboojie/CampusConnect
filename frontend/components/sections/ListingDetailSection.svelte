@@ -2,8 +2,9 @@
   import { onDestroy } from 'svelte'
   import { getJson, isAbortError, sendForm, sendJson } from '../../lib/api'
   import { formatClock, formatDate, formatDateTime, formatDuration, formatRating } from '../../lib/format'
-  import type { ListingDetails, ListingFormOptions, PublicUser, ResourceFilterOptions } from '../../lib/types'
+  import type { ListingDetails, ListingFormOptions, OwnerReservationReview, PublicUser, ResourceFilterOptions } from '../../lib/types'
   import ResourceForm from '../resources/ResourceForm.svelte'
+  import ReservationReviewForm from '../reservations/ReservationReviewForm.svelte'
 
   export let listingId: string
   export let user: PublicUser
@@ -19,6 +20,10 @@
   let deleteError = ''
   let controller: AbortController | undefined
   let image: ListingDetails['images'][number] | undefined
+  let reservationReviews: OwnerReservationReview[] = []
+  let reviewsLoading = true
+  let reviewsError = ''
+  let reviewing: OwnerReservationReview | null = null
 
   $: void load(listingId)
   $: image = listing?.images[0]
@@ -32,6 +37,7 @@
     try {
       const payload = await getJson<{ listing: ListingDetails }>(`/api/listings/${encodeURIComponent(id)}`, request.signal)
       listing = payload.listing
+      void loadReservationReviews(id, request.signal)
     } catch (caught) {
       if (isAbortError(caught)) return
       listing = null
@@ -39,6 +45,36 @@
     } finally {
       if (controller === request) loading = false
     }
+  }
+
+  async function loadReservationReviews(id: string, signal: AbortSignal) {
+    reviewsLoading = true
+    reviewsError = ''
+    try {
+      const payload = await getJson<{ reservations: OwnerReservationReview[] }>(
+        `/api/listings/${encodeURIComponent(id)}/reservation-reviews`,
+        signal,
+      )
+      reservationReviews = payload.reservations
+    } catch (caught) {
+      if (isAbortError(caught)) return
+      reservationReviews = []
+      reviewsError = caught instanceof Error ? caught.message : 'Unable to load past reservations for review.'
+    } finally {
+      if (!signal.aborted) reviewsLoading = false
+    }
+  }
+
+  async function submitReview(input: { reservationId: number; rating: number; reason: string | null; isAnonymous: boolean }) {
+    const payload = await sendJson<{ reservation: OwnerReservationReview }>(
+      'POST',
+      `/api/listings/${encodeURIComponent(listingId)}/reservation-reviews`,
+      input,
+    )
+    reservationReviews = reservationReviews.map((reservation) =>
+      reservation.reservationId === payload.reservation.reservationId ? payload.reservation : reservation,
+    )
+    reviewing = null
   }
 
   async function loadOptions() {
@@ -203,12 +239,51 @@
           {#if listing.recentReviews.length === 0}<p class="muted">No reviews yet.</p>{:else}<ul class="review-list">{#each listing.recentReviews as review}<li class="review"><p class="review-heading"><span class="star">{'★'.repeat(review.rating)}{'☆'.repeat(Math.max(0, 5 - review.rating))}</span><span class="muted">{review.reviewerUsername ?? 'Anonymous'} · {formatDate(review.createdAt)}</span></p>{#if review.reason}<p>{review.reason}</p>{/if}</li>{/each}</ul>{/if}
         </section>
       </div>
+
+      <section class="detail-block detail-block-wide owner-review-block" aria-labelledby="past-reservations-title">
+        <div class="section-heading-row">
+          <div>
+            <h3 id="past-reservations-title">Past reservations</h3>
+            <p class="muted">Review completed reservations from the past seven days.</p>
+          </div>
+        </div>
+        {#if reviewsLoading}
+          <p class="muted" aria-live="polite">Loading past reservations…</p>
+        {:else if reviewsError}
+          <div class="notice error-notice" role="alert"><p>{reviewsError}</p><button type="button" class="secondary-button" on:click={() => listingId && loadReservationReviews(listingId, new AbortController().signal)}>Try again</button></div>
+        {:else if reservationReviews.length === 0}
+          <p class="muted">No completed reservations from the past seven days.</p>
+        {:else}
+          <ul class="owner-review-list">
+            {#each reservationReviews as reservation (reservation.reservationId)}
+              <li class="owner-review-row">
+                <div>
+                  <strong><a href={`#/users/${reservation.reserver.id}`}>{reservation.reserver.username}</a></strong>
+                  <span class="muted">{formatDateTime(reservation.startTime)} – {formatClock(reservation.endTime.slice(11, 16))}</span>
+                </div>
+                {#if reservation.review}
+                  <div class="owner-review-complete">
+                    <span class="status-badge status-completed">Reviewed</span>
+                    <span class="star" aria-label={`${reservation.review.rating} out of 5 stars`}>{'★'.repeat(reservation.review.rating)}{'☆'.repeat(Math.max(0, 5 - reservation.review.rating))}</span>
+                  </div>
+                {:else}
+                  <button type="button" class="secondary-button" on:click={() => reviewing = reservation}>Review reservation</button>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </section>
     </article>
   {/if}
 </section>
 
 {#if editing && listing && options}
   <ResourceForm title="Edit resource" submitLabel="Save changes" initial={listing} {options} onSubmit={save} onClose={() => editing = false} />
+{/if}
+
+{#if reviewing}
+  <ReservationReviewForm reservation={reviewing} onSubmit={submitReview} onClose={() => reviewing = null} />
 {/if}
 
 {#if deleting && listing}
