@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import Sidebar from './Sidebar.svelte'
+  import ActivitySection from './sections/ActivitySection.svelte'
   import AnnouncementsSection from './sections/AnnouncementsSection.svelte'
   import CreditsSection from './sections/CreditsSection.svelte'
   import ListingsSection from './sections/ListingsSection.svelte'
@@ -115,6 +116,8 @@
       <ReservationsSection {user} {onUserUpdated} />
     {:else if route.id === 'credits'}
       <CreditsSection {user} {onUserUpdated} />
+    {:else if route.id === 'activity'}
+      <ActivitySection />
     {:else if route.id === 'announcements'}
       <AnnouncementsSection />
     {:else}

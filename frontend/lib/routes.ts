@@ -1,4 +1,4 @@
-export type RouteId = 'profile' | 'resources' | 'reservations' | 'credits' | 'listings' | 'notifications' | 'announcements'
+export type RouteId = 'profile' | 'resources' | 'reservations' | 'credits' | 'activity' | 'listings' | 'notifications' | 'announcements'
 
 export type AppRoute = {
   id: RouteId
@@ -40,6 +40,12 @@ export const routes: AppRoute[] = [
       'M12 6.4v1.5',
       'M12 16v1.6',
     ],
+  },
+  {
+    id: 'activity',
+    label: 'My Activity',
+    description: 'Statistics about your reservations: monthly activity, categories, and favorite resources.',
+    icon: ['M4 20h16', 'M7 16.5v-5', 'M12 16.5V7', 'M17 16.5v-8'],
   },
   {
     id: 'listings',

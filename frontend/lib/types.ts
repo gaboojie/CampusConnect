@@ -237,3 +237,42 @@ export type AdminStats = {
   resources: { total: number }
   reservations: { total: number; byStatus: Record<string, number> }
 }
+
+// Mirrors db/repositories/analytics.ts. 'completed' is the stored status;
+// 'past' is a confirmed reservation whose booked time has ended.
+export type ReservationOutcome =
+  | 'upcoming'
+  | 'in_progress'
+  | 'completed'
+  | 'past'
+  | 'no_show'
+  | 'cancelled'
+  | 'other'
+
+export type OutcomeCounts = Record<ReservationOutcome, number>
+
+export type UserAnalytics = {
+  overview: {
+    total: number
+    upcoming: number
+    past: number
+    cancelled: number
+    pastReservedHours: number
+    byOutcome: OutcomeCounts
+  }
+  monthly: {
+    // "YYYY-MM", oldest first.
+    months: Array<{ month: string; total: number; byOutcome: OutcomeCounts }>
+    beforeWindow: number
+    afterWindow: number
+  }
+  categories: Array<{ id: number; name: string; reservations: number; hours: number }>
+  topResources: Array<{
+    id: number
+    name: string
+    building: NamedOption
+    reservations: number
+    hours: number
+    lastReservedAt: string
+  }>
+}
