@@ -43,6 +43,13 @@ export const adminRoutes: AdminRoute[] = [
 
 export const DEFAULT_ADMIN_ROUTE = adminRoutes[0]
 
+const MAIN_APP_ADMIN_ROUTES: Record<AdminRouteId, string> = {
+  overview: 'admin-overview',
+  users: 'admin-users',
+  reservations: 'admin-reservations',
+  resources: 'admin-resources',
+}
+
 export type AdminLocation = {
   route: AdminRoute
   // Second segment, e.g. the user id in "#/users/12".
@@ -50,7 +57,8 @@ export type AdminLocation = {
 }
 
 export function adminHash(id: string): string {
-  return `#/${id}`
+  const mainAppRoute = MAIN_APP_ADMIN_ROUTES[id as AdminRouteId]
+  return `#/${mainAppRoute ?? id}`
 }
 
 export function isAdminPath(pathname: string): boolean {

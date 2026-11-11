@@ -2,6 +2,11 @@
   import { onMount } from 'svelte'
   import Sidebar from './Sidebar.svelte'
   import ActivitySection from './sections/ActivitySection.svelte'
+  import AdminOverviewSection from './sections/AdminOverviewSection.svelte'
+  import AdminReservationsSection from './sections/AdminReservationsSection.svelte'
+  import AdminResourcesSection from './sections/AdminResourcesSection.svelte'
+  import AdminUserDetailSection from './sections/AdminUserDetailSection.svelte'
+  import AdminUsersSection from './sections/AdminUsersSection.svelte'
   import AnnouncementsSection from './sections/AnnouncementsSection.svelte'
   import CreditsSection from './sections/CreditsSection.svelte'
   import ListingsSection from './sections/ListingsSection.svelte'
@@ -76,13 +81,20 @@
   $: route = user.isBanned ? routes[0] : location.route
   $: visibleRoutes = user.isBanned
     ? routes.filter((candidate) => candidate.id === 'profile')
-    : routes.filter((candidate) => !candidate.hidden)
+    : routes.filter((candidate) => !candidate.hidden && (!candidate.adminOnly || user.role === 'admin'))
 </script>
 
 <svelte:window on:hashchange={syncRoute} on:keydown={handleKeydown} />
 
 <div class="app-layout" class:sidebar-collapsed={collapsed} class:drawer-open={drawerOpen}>
-  <Sidebar routes={visibleRoutes} currentId={route.id} {collapsed} onToggle={toggleCollapsed} onNavigate={closeDrawer} />
+  <Sidebar
+    routes={visibleRoutes}
+    currentId={route.id}
+    isAdmin={user.role === 'admin'}
+    {collapsed}
+    onToggle={toggleCollapsed}
+    onNavigate={closeDrawer}
+  />
 
   {#if drawerOpen}
     <button type="button" class="drawer-backdrop" aria-label="Close navigation" on:click={closeDrawer}></button>
@@ -107,6 +119,18 @@
 
     {#if user.isBanned || route.id === 'profile'}
       <ProfileSection {user} {submitting} {onLogout} {onAccountDeleted} {onUserUpdated} />
+    {:else if route.id === 'admin-overview'}
+      <AdminOverviewSection />
+    {:else if route.id === 'admin-users' && location.subpath}
+      {#key location.subpath}
+        <AdminUserDetailSection userId={location.subpath} currentUserId={user.userId} />
+      {/key}
+    {:else if route.id === 'admin-users'}
+      <AdminUsersSection currentUserId={user.userId} />
+    {:else if route.id === 'admin-reservations'}
+      <AdminReservationsSection />
+    {:else if route.id === 'admin-resources'}
+      <AdminResourcesSection />
     {:else if route.id === 'users' && location.subpath}
       <UserProfileSection userId={location.subpath} />
     {:else if route.id === 'resources' && location.subpath}

@@ -1,4 +1,17 @@
-export type RouteId = 'profile' | 'users' | 'resources' | 'reservations' | 'credits' | 'activity' | 'listings' | 'notifications' | 'announcements'
+export type RouteId =
+  | 'profile'
+  | 'users'
+  | 'resources'
+  | 'reservations'
+  | 'credits'
+  | 'activity'
+  | 'listings'
+  | 'notifications'
+  | 'announcements'
+  | 'admin-overview'
+  | 'admin-users'
+  | 'admin-reservations'
+  | 'admin-resources'
 
 export type AppRoute = {
   id: RouteId
@@ -7,6 +20,7 @@ export type AppRoute = {
   // Stroke-only SVG path data drawn in a 24×24 viewBox.
   icon: string[]
   hidden?: boolean
+  adminOnly?: boolean
 }
 
 export const routes: AppRoute[] = [
@@ -67,6 +81,39 @@ export const routes: AppRoute[] = [
     description: 'Campus-wide maintenance notices and newly listed resources.',
     icon: ['M4 10v4h3l8 4.5v-13L7 10Z', 'M18 9.5a3.5 3.5 0 0 1 0 5', 'M7 14l1.5 5h2.5L10 14'],
   },
+  {
+    id: 'admin-overview',
+    label: 'Overview',
+    description: 'Totals for users, resources, and reservations.',
+    icon: ['M4 13h6V4H4Z', 'M14 20h6V4h-6Z', 'M4 20h6v-4H4Z'],
+    adminOnly: true,
+  },
+  {
+    id: 'admin-users',
+    label: 'Users',
+    description: 'Every registered account and its details.',
+    icon: [
+      'M9 5.5a3 3 0 1 1 0 6a3 3 0 0 1-3-3a3 3 0 0 1 3-3Z',
+      'M3.5 19c.6-3.3 2.6-5 5.5-5s4.9 1.7 5.5 5',
+      'M16 5.8a3 3 0 0 1 0 5.4',
+      'M17.5 14.3c1.6.5 2.6 2 3 4.7',
+    ],
+    adminOnly: true,
+  },
+  {
+    id: 'admin-reservations',
+    label: 'Reservations',
+    description: 'All reservations across campus.',
+    icon: ['M5 6.5h14v13H5Z', 'M5 10.5h14', 'M9 4v4', 'M15 4v4'],
+    adminOnly: true,
+  },
+  {
+    id: 'admin-resources',
+    label: 'Resources',
+    description: 'Review and manage every listed resource.',
+    icon: ['M4 4h7.5l8.5 8.5-7.5 7.5L4 11.5Z', 'M8.5 8.5h.01'],
+    adminOnly: true,
+  },
 ]
 
 export const DEFAULT_ROUTE = routes[0]
@@ -84,7 +131,7 @@ export type AppLocation = {
 }
 
 // Routes that accept a numeric second segment.
-const ROUTES_WITH_ID: RouteId[] = ['resources', 'listings', 'users']
+const ROUTES_WITH_ID: RouteId[] = ['resources', 'listings', 'users', 'admin-users']
 
 // Only "#/<id>" hashes are routes, so other hashes such as "#verify=<token>" are left alone.
 export function parseLocation(hash: string): AppLocation {

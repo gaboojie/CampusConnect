@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import AppLayout from './components/AppLayout.svelte'
-  import AdminLayout from './components/AdminLayout.svelte'
   import NotificationBell from './components/NotificationBell.svelte'
   import ProfileMenu from './components/ProfileMenu.svelte'
   import { isAdminPath } from './lib/adminRoutes'
@@ -87,6 +86,7 @@
 
       if (response.ok && payload.user) {
         user = payload.user
+        if (onAdminPath) clearAppRouteHash()
       } else if (response.status === 401) {
         user = null
       } else {
@@ -117,6 +117,7 @@
       }
 
       user = payload.user
+      clearAppRouteHash()
       loginPassword = ''
       message = 'You are signed in.'
     } catch {
@@ -296,11 +297,7 @@
         <p>Checking your session…</p>
       </section>
     {:else if user}
-      {#if onAdminPath}
-        <AdminLayout {user} />
-      {:else}
-        <AppLayout {user} {submitting} onLogout={logout} onAccountDeleted={handleAccountDeleted} onUserUpdated={handleUserUpdated} />
-      {/if}
+      <AppLayout {user} {submitting} onLogout={logout} onAccountDeleted={handleAccountDeleted} onUserUpdated={handleUserUpdated} />
     {:else if verificationToken}
       <section class="panel verification-card">
         <p class="eyebrow">One last step</p>
