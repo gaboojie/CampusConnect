@@ -28,7 +28,9 @@ import {
   deleteAccount,
   deleteSession,
   findAuthenticatedUser,
+  clearFailedLogins,
   findLoginUser,
+  recordFailedLogin,
   getPasswordHash,
   healthCheck,
   updatePassword,
@@ -62,13 +64,29 @@ import {
   parseReservationReviewInput,
   parseReviewPageQuery,
 } from "../db/repositories/reservationReviews";
+import { getDayCalendar, parseCalendarQuery } from "../db/repositories/calendar";
 import {
+  listInbox,
+  markAllInboxNotificationsRead,
+  markInboxNotificationRead,
+  parseInboxQuery,
+} from "../db/repositories/inbox";
+import {
+  createUser as createAdminUser,
+  deleteResource as deleteAdminResource,
+  deleteUserAccount,
+  getAdminResourceDetail,
   getStats,
   getUserDetail,
+  listAdminResources,
   listReservations,
   listUsers,
+  parseAdminCreateUser,
   parseAdminReservationQuery,
+  parseAdminResourceQuery,
+  parseAdminUpdateUser,
   parseAdminUserQuery,
+  updateUser as updateAdminUser,
 } from "../db/repositories/admin";
 import {
   cancelReservation,
@@ -534,22 +552,44 @@ export function createApp(options: AppOptions = {}) {
             return null;
           }
           if (user.is_account_deleted) {
-            return { deleted: true as const };
-          }
-          if (!user.email_verified_at || !(await verifyPassword(password, user.password_hash))) {
-            return null;
+            return { kind: "deleted" as const };
           }
 
+          // While locked, even the correct password is refused.
+          const lockSeconds = Number(user.lock_seconds_remaining ?? 0);
+          if (lockSeconds > 0) {
+            return { kind: "locked" as const, seconds: lockSeconds };
+          }
+          if (!user.email_verified_at) {
+            return null;
+          }
+          if (!(await verifyPassword(password, user.password_hash))) {
+            const failure = await recordFailedLogin(client, user.user_id);
+            return failure.locked ? { kind: "locked" as const, seconds: failure.lockSeconds } : null;
+          }
+
+          await clearFailedLogins(client, user.user_id);
           const token = await createSessionToken();
           const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
           const tokenHash = await hashSessionToken(token);
           await createSessionRecord(client, user.user_id, tokenHash, expiresAt);
-          return { session: { token, expiresAt }, user };
+          return { kind: "session" as const, session: { token, expiresAt }, user };
         },
       );
 
-      if (result && "deleted" in result) {
+      if (result?.kind === "deleted") {
         return c.json({ error: "Your account has been deleted." }, 403);
+      }
+      if (result?.kind === "locked") {
+        const minutes = Math.max(1, Math.ceil(result.seconds / 60));
+        return c.json(
+          {
+            error: `Too many failed sign-in attempts. Please wait ${minutes} ${minutes === 1 ? "minute" : "minutes"} before trying again.`,
+            retryAfterSeconds: result.seconds,
+          },
+          429,
+          { "Retry-After": String(result.seconds) },
+        );
       }
       if (!result) {
         return c.json({ error: "Invalid username/email or password." }, 401);
@@ -1187,6 +1227,95 @@ export function createApp(options: AppOptions = {}) {
     }
   });
 
+  // The signed-in user's in-app notifications: reminders that have come due and
+  // cancellation notices, with read state.
+  app.get("/api/notifications", async (c) => {
+    const query = parseInboxQuery(new URL(c.req.url).searchParams);
+
+    if (!query.ok) {
+      return c.json({ error: query.error }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const inbox = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => listInbox(client, c.get("user").userId, query.value),
+      );
+      return c.json(inbox);
+    } catch {
+      return c.json({ error: "Unable to load your notifications right now." }, 503);
+    }
+  });
+
+  app.post("/api/notifications/read-all", async (c) => {
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const updated = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => markAllInboxNotificationsRead(client, c.get("user").userId),
+      );
+      return c.json({ updated });
+    } catch {
+      return c.json({ error: "Unable to update your notifications right now." }, 503);
+    }
+  });
+
+  app.post("/api/notifications/:id/read", async (c) => {
+    const notificationId = parsePositiveId(c.req.param("id"));
+
+    if (notificationId === null) {
+      return c.json({ error: "Notification id must be a positive whole number." }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const found = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => markInboxNotificationRead(client, c.get("user").userId, notificationId),
+      );
+      return found ? c.json({ read: true }) : c.json({ error: "Notification not found." }, 404);
+    } catch {
+      return c.json({ error: "Unable to update your notification right now." }, 503);
+    }
+  });
+
+  // Day-grid availability for the calendar views. Everyone signed in can see which
+  // slots are open or taken; only administrators also see who booked them.
+  app.get("/api/calendar", async (c) => {
+    const query = parseCalendarQuery(new URL(c.req.url).searchParams);
+
+    if (!query.ok) {
+      return c.json({ error: query.error }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    const viewer = { userId: c.get("user").userId, isAdmin: c.get("user").role === "admin" };
+
+    try {
+      const calendar = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getDayCalendar(client, query.value, viewer),
+      );
+      return c.json(calendar);
+    } catch {
+      return c.json({ error: "Unable to load the calendar right now." }, 503);
+    }
+  });
+
   app.get("/api/admin/stats", async (c) => {
     if (!c.env.DB) {
       return databaseUnavailable(c);
@@ -1272,6 +1401,179 @@ export function createApp(options: AppOptions = {}) {
       return c.json(reservations);
     } catch {
       return c.json({ error: "Unable to load reservations right now." }, 503);
+    }
+  });
+
+  app.post("/api/admin/users", async (c) => {
+    const validation = parseAdminCreateUser(await readJson(c));
+
+    if (!validation.ok) {
+      return c.json(
+        { error: "Please correct the highlighted fields.", fieldErrors: validation.fieldErrors },
+        400,
+      );
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    const { password, ...account } = validation.value;
+    const passwordHash = await hashPassword(password);
+
+    try {
+      const user = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => createAdminUser(client, { ...account, passwordHash }),
+      );
+      return c.json({ user }, 201);
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        return c.json({ error: "That username or email is already in use." }, 409);
+      }
+      return c.json({ error: "Unable to create the account right now." }, 503);
+    }
+  });
+
+  app.patch("/api/admin/users/:id", async (c) => {
+    const userId = parsePositiveId(c.req.param("id"));
+
+    if (userId === null) {
+      return c.json({ error: "User id must be a positive whole number." }, 400);
+    }
+
+    const validation = parseAdminUpdateUser(await readJson(c));
+    if (!validation.ok) {
+      return c.json(
+        { error: "Please correct the highlighted fields.", fieldErrors: validation.fieldErrors },
+        400,
+      );
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    const actingAdminId = c.get("user").userId;
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => updateAdminUser(client, actingAdminId, userId, validation.value),
+      );
+
+      if (!result.ok) {
+        return c.json({ error: result.error }, result.status);
+      }
+      return c.json({ user: result.value });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        return c.json({ error: "That username or email is already in use." }, 409);
+      }
+      return c.json({ error: "Unable to update this user right now." }, 503);
+    }
+  });
+
+  app.delete("/api/admin/users/:id", async (c) => {
+    const userId = parsePositiveId(c.req.param("id"));
+
+    if (userId === null) {
+      return c.json({ error: "User id must be a positive whole number." }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    const actingAdminId = c.get("user").userId;
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => deleteUserAccount(client, c.env.RESOURCE_IMAGES, actingAdminId, userId),
+      );
+
+      if (!result.ok) {
+        return c.json({ error: result.error }, result.status);
+      }
+      return c.json({ deleted: true });
+    } catch {
+      return c.json({ error: "Unable to delete this account right now." }, 503);
+    }
+  });
+
+  app.get("/api/admin/resources", async (c) => {
+    const query = parseAdminResourceQuery(new URL(c.req.url).searchParams);
+
+    if (!query.ok) {
+      return c.json({ error: query.error }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const resources = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => listAdminResources(client, query.value),
+      );
+      return c.json(resources);
+    } catch {
+      return c.json({ error: "Unable to load resources right now." }, 503);
+    }
+  });
+
+  app.get("/api/admin/resources/:id", async (c) => {
+    const resourceId = parsePositiveId(c.req.param("id"));
+
+    if (resourceId === null) {
+      return c.json({ error: "Resource id must be a positive whole number." }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const resource = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => getAdminResourceDetail(client, resourceId),
+      );
+
+      if (!resource) {
+        return c.json({ error: "Resource not found." }, 404);
+      }
+      return c.json({ resource });
+    } catch {
+      return c.json({ error: "Unable to load this resource right now." }, 503);
+    }
+  });
+
+  app.delete("/api/admin/resources/:id", async (c) => {
+    const resourceId = parsePositiveId(c.req.param("id"));
+
+    if (resourceId === null) {
+      return c.json({ error: "Resource id must be a positive whole number." }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => deleteAdminResource(client, c.env.RESOURCE_IMAGES, resourceId),
+      );
+
+      if (!result.ok) {
+        return c.json({ error: result.error }, result.status);
+      }
+      enqueueNotificationWorkflows(c, result.notificationIds);
+      return c.json({ deleted: true, cancelledReservations: result.value.cancelledReservations });
+    } catch {
+      return c.json({ error: "Unable to delete this resource right now." }, 503);
     }
   });
 

@@ -7,7 +7,8 @@
 - `db/` is the database boundary. It contains the PostgreSQL client wrapper, all SQL-backed repositories, migrations, migration utilities, and database reference material.
 - `tests/` contains the application and API tests.
 - `public/` contains static assets copied into the Vite build.
-- `reports/` and `roles/` are reserved, intentionally empty directories.
+- `roles/` holds one page per team member describing their contributions.
+- `reports/` is a reserved, intentionally empty directory.
 
 ## Database boundary
 
@@ -18,7 +19,11 @@ The canonical migration set is:
 ```text
 db/migrations/001_schema.sql
 db/migrations/002_seed.sql
+db/migrations/003_notification_read.sql
+db/migrations/004_login_lockout.sql
 ```
+
+`003` and `004` are additive (`ADD COLUMN IF NOT EXISTS`), so an existing database is brought up to date with `npm run migrate:dev` or `npm run migrate:prod` and does not need a reset.
 
 Development and production use the same ordered migration files. The `--environment dev|prod` option selects the corresponding connection configuration and does not select a different SQL copy.
 

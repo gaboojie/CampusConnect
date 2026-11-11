@@ -1,5 +1,16 @@
 // Small JSON helpers for the authenticated API. They throw an Error whose
-// message is safe to show to the user.
+// message is safe to show to the user. Validation failures also carry the
+// per-field messages the API returned.
+export class ApiError extends Error {
+  fieldErrors: Record<string, string>
+
+  constructor(message: string, fieldErrors: Record<string, string> = {}) {
+    super(message)
+    this.name = 'ApiError'
+    this.fieldErrors = fieldErrors
+  }
+}
+
 export async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   return requestJson<T>(url, { signal })
 }
@@ -65,7 +76,12 @@ async function requestJson<T>(url: string, init: RequestInit): Promise<T> {
       payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string'
         ? payload.error
         : `Request failed (HTTP ${response.status}).`
-    throw new Error(message)
+    const fieldErrors =
+      payload && typeof payload === 'object' && 'fieldErrors' in payload && payload.fieldErrors
+        && typeof payload.fieldErrors === 'object'
+        ? (payload.fieldErrors as Record<string, string>)
+        : {}
+    throw new ApiError(message, fieldErrors)
   }
 
   return payload as T

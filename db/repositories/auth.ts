@@ -219,16 +219,25 @@ export async function createVerificationTokenRecord(
   }
 }
 
+export const LOGIN_MAX_FAILED_ATTEMPTS = 5;
+export const LOGIN_LOCK_SECONDS = 5 * 60;
+
+export type LoginUserRow = DatabaseUserRow & {
+  // Seconds left on the sign-in lock; 0 or missing when the account is not locked.
+  lock_seconds_remaining?: number | string | null;
+};
+
 export async function findLoginUser(
   client: DatabaseClient,
   identifier: string,
-): Promise<DatabaseUserRow | null> {
-  const result = await client.query<DatabaseUserRow>(
+): Promise<LoginUserRow | null> {
+  const result = await client.query<LoginUserRow>(
     `
       SELECT
         ${AUTH_USER_COLUMNS.replaceAll("u.", "")},
         email_verified_at,
-        password_hash
+        password_hash,
+        GREATEST(0, CEIL(EXTRACT(EPOCH FROM (locked_until - now()))))::integer AS lock_seconds_remaining
       FROM "User"
       WHERE LOWER(email) = LOWER($1) OR username = $1
       LIMIT 1
@@ -237,6 +246,50 @@ export async function findLoginUser(
   );
 
   return result.rows[0] ?? null;
+}
+
+// Counts one failed password attempt in a single atomic statement. The fifth failure
+// starts the lock and resets the counter, so the next five attempts after it expires
+// are fresh.
+export async function recordFailedLogin(
+  client: DatabaseClient,
+  userId: number,
+): Promise<{ locked: boolean; lockSeconds: number }> {
+  const result = await client.query<{ locked: boolean; lock_seconds: number | string }>(
+    `
+      UPDATE "User"
+      SET
+        failed_login_attempts = CASE
+          WHEN failed_login_attempts + 1 >= $2 THEN 0
+          ELSE failed_login_attempts + 1
+        END,
+        locked_until = CASE
+          WHEN failed_login_attempts + 1 >= $2 THEN now() + make_interval(secs => $3)
+          ELSE locked_until
+        END
+      WHERE user_id = $1
+      RETURNING
+        (failed_login_attempts = 0) AS locked,
+        GREATEST(0, CEIL(EXTRACT(EPOCH FROM (locked_until - now()))))::integer AS lock_seconds
+    `,
+    [userId, LOGIN_MAX_FAILED_ATTEMPTS, LOGIN_LOCK_SECONDS],
+  );
+
+  const row = result.rows[0];
+  return { locked: row?.locked === true, lockSeconds: Number(row?.lock_seconds ?? 0) };
+}
+
+// A successful sign-in clears the failure count and any expired lock.
+export async function clearFailedLogins(client: DatabaseClient, userId: number): Promise<void> {
+  await client.query(
+    `
+      UPDATE "User"
+      SET failed_login_attempts = 0, locked_until = NULL
+      WHERE user_id = $1
+        AND (failed_login_attempts <> 0 OR locked_until IS NOT NULL)
+    `,
+    [userId],
+  );
 }
 
 export async function updateUsername(

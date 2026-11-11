@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import AppLayout from './components/AppLayout.svelte'
   import AdminLayout from './components/AdminLayout.svelte'
+  import NotificationBell from './components/NotificationBell.svelte'
   import ProfileMenu from './components/ProfileMenu.svelte'
   import { isAdminPath } from './lib/adminRoutes'
   import type { PublicUser } from './lib/types'
@@ -264,7 +265,10 @@
   <header class="site-header">
     <a class="brand" href="/" aria-label="CampusConnect home">Campus Connect</a>
     {#if user}
-      <ProfileMenu {user} {submitting} onLogout={logout} />
+      <div class="header-actions">
+        {#if !user.isBanned}<NotificationBell />{/if}
+        <ProfileMenu {user} {submitting} onLogout={logout} />
+      </div>
     {:else}
       <div class="account-indicator" aria-label="Not signed in">
         <svg class="user-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -407,6 +411,10 @@
             <span>Email notifications</span>
           </label>
         </fieldset>
+
+        {#if error}
+          <p class="notice error-notice" role="alert">{error}</p>
+        {/if}
 
         <button type="submit" disabled={submitting}>
           {submitting ? 'Creating account…' : 'Create account'}

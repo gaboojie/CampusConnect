@@ -4,6 +4,8 @@
   import { formatClock, formatDate, formatDateTime, formatDuration, formatRating } from '../../lib/format'
   import { routeHash } from '../../lib/routes'
   import type { CreditSummary, PublicUser, ResourceDetails, ReservationWriteResponse, SlotInput } from '../../lib/types'
+  import { suggestSlot } from '../../lib/calendar'
+  import AvailabilityCalendar from '../AvailabilityCalendar.svelte'
   import ReservationForm from '../reservations/ReservationForm.svelte'
 
   export let resourceId: string
@@ -17,6 +19,9 @@
   let error = ''
   let controller: AbortController | undefined
   let reserving = false
+  // Set when a slot is chosen on the availability grid, so the form opens prefilled.
+  let pickedSlot: SlotInput | null = null
+  let pickedNote = ''
 
   $: backHref = `#/resources${backQuery ? `?${backQuery}` : ''}`
   $: image = resource?.images[0] ?? null
@@ -124,7 +129,7 @@
           </p>
 
           <div class="reserve-box">
-            <button type="button" on:click={() => (reserving = true)} disabled={!affordable}>Reserve</button>
+            <button type="button" on:click={() => { pickedSlot = null; pickedNote = ''; reserving = true }} disabled={!affordable}>Reserve</button>
             <p class="muted">
               Costs {credits(cost)} per booking · You have {credits(user.creditBalance)}.
               <a class="text-link" href="#/credits">My credits</a>
@@ -135,6 +140,23 @@
           </div>
         </div>
       </div>
+
+      <section class="detail-block detail-availability">
+        <h3>Availability</h3>
+        <p class="muted">Green slots are open. Click one to reserve it. Red slots are booked, and blue slots are yours.</p>
+        {#key resource.id}
+          <AvailabilityCalendar
+            resourceId={resource.id}
+            onPickSlot={(slotResource, start, date) => {
+              const suggestion = suggestSlot(slotResource, date, start)
+              pickedSlot = suggestion.slot
+              pickedNote = suggestion.note
+              reserving = true
+            }}
+            onPickBooking={() => (window.location.hash = routeHash('reservations'))}
+          />
+        {/key}
+      </section>
 
       <div class="detail-info-grid">
         <section class="detail-block detail-block-wide">
@@ -252,14 +274,14 @@
     {#if reserving}
       <ReservationForm
         title={resource.name}
-        subtitle="Reserve"
+        subtitle={pickedSlot && pickedNote ? pickedNote : 'Reserve'}
         submitLabel="Reserve"
-        initial={initialSlot()}
+        initial={pickedSlot ?? initialSlot()}
         maxMinutes={resource.maxReservationMinutes ?? 240}
         note={`This booking costs ${credits(cost)}. You have ${credits(user.creditBalance)}, so ${credits(Math.max(0, user.creditBalance - cost))} will remain. Cancel at least 24 hours ahead for a full refund.`}
         noteWarning={!affordable}
         onSubmit={reserve}
-        onClose={() => (reserving = false)}
+        onClose={() => { reserving = false; pickedSlot = null }}
       />
     {/if}
   {/if}

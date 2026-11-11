@@ -216,6 +216,24 @@ export type SlotInput = {
   end: string
 }
 
+export type AppNotification = {
+  id: number
+  type: string
+  message: string
+  reservationId: number | null
+  // Campus wall-clock time the notification was delivered.
+  deliveredAt: string
+  isRead: boolean
+}
+
+export type Inbox = {
+  items: AppNotification[]
+  unreadCount: number
+  total: number
+  page: number
+  pageSize: number
+}
+
 export type AnnouncementType = 'maintenance' | 'new'
 
 export type Announcement = {
@@ -264,10 +282,61 @@ export type AdminReservation = {
   resource: { id: number; name: string }
 }
 
+export type AdminResource = {
+  id: number
+  name: string
+  building: { id: number; name: string }
+  category: { id: number; name: string }
+  owner: { id: number; username: string }
+  createdAt: string
+  upcomingReservations: number
+}
+
+// Day-grid availability. All times are minutes since midnight in campus time.
+export type CalendarSpan = { start: number; end: number }
+
+export type CalendarBooking = CalendarSpan & {
+  // Only administrators receive the reservation id and the booker's username.
+  id: number | null
+  userId: number | null
+  username: string | null
+  status: string
+  mine: boolean
+}
+
+export type CalendarResource = {
+  id: number
+  name: string
+  building: NamedOption
+  category: NamedOption
+  capacity: number
+  requiredCredits: number
+  maxReservationMinutes: number | null
+  windows: CalendarSpan[]
+  bookings: CalendarBooking[]
+  maintenance: Array<CalendarSpan & { reason: string }>
+}
+
+export type DayCalendar = {
+  date: string
+  today: string
+  nowMinutes: number
+  total: number
+  limit: number
+  resources: CalendarResource[]
+}
+
+export type AdminResourceDetail = ResourceDetails & {
+  owner: { id: number; username: string }
+  reservationCounts: Record<string, number>
+  upcomingReservations: number
+}
+
 export type AdminStats = {
   users: { total: number; verified: number; unverified: number; banned: number; byRole: Record<string, number> }
   resources: { total: number }
   reservations: { total: number; byStatus: Record<string, number> }
+  activity: Array<{ date: string; reservations: number; signups: number }>
 }
 
 // Mirrors db/repositories/analytics.ts. 'completed' is the stored status;

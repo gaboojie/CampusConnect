@@ -3,9 +3,9 @@
   import Sidebar from './Sidebar.svelte'
   import AdminOverviewSection from './sections/AdminOverviewSection.svelte'
   import AdminReservationsSection from './sections/AdminReservationsSection.svelte'
+  import AdminResourcesSection from './sections/AdminResourcesSection.svelte'
   import AdminUserDetailSection from './sections/AdminUserDetailSection.svelte'
   import AdminUsersSection from './sections/AdminUsersSection.svelte'
-  import PlaceholderSection from './sections/PlaceholderSection.svelte'
   import {
     DEFAULT_ADMIN_ROUTE,
     adminHash,
@@ -113,14 +113,14 @@
 
       {#if route.id === 'users' && location.subpath}
         {#key location.subpath}
-          <AdminUserDetailSection userId={location.subpath} />
+          <AdminUserDetailSection userId={location.subpath} currentUserId={user.userId} />
         {/key}
       {:else if route.id === 'users'}
-        <AdminUsersSection />
+        <AdminUsersSection currentUserId={user.userId} />
       {:else if route.id === 'reservations'}
         <AdminReservationsSection />
       {:else if route.id === 'resources'}
-        <PlaceholderSection {route} />
+        <AdminResourcesSection />
       {:else}
         <AdminOverviewSection />
       {/if}
