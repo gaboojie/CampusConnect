@@ -182,7 +182,7 @@
       </div>
 
       <div class="detail-columns">
-        <section class="detail-block">
+        <section class="detail-block feature-detail-block">
           <h3>Features</h3>
           {#if listing.features.length === 0}<p class="muted">No features listed.</p>{:else}<ul class="feature-details">{#each listing.features as feature}<li><strong>{feature.name}</strong><span class="muted">{feature.description}</span></li>{/each}</ul>{/if}
         </section>
@@ -195,7 +195,15 @@
       <div class="detail-columns detail-secondary-grid">
         <section class="detail-block">
           <h3>Upcoming maintenance</h3>
-          {#if listing.upcomingMaintenance.length === 0}<p class="muted">No maintenance scheduled.</p>{:else}<ul class="maintenance-list">{#each listing.upcomingMaintenance as period}<li><strong>{formatDateTime(period.startTime)} – {formatDateTime(period.endTime)}</strong><span class="muted">{period.reason}</span></li>{/each}</ul>{/if}
+          {#if listing.upcomingMaintenance.length === 0}
+            <p class="muted">No maintenance scheduled.</p>
+          {:else}
+            <ul class="maintenance-list">
+              {#each listing.upcomingMaintenance as period}
+                <li><strong>{formatDateTime(period.startTime)} – {formatDateTime(period.endTime)}</strong><span class="muted">{period.reason}</span></li>
+              {/each}
+            </ul>
+          {/if}
         </section>
 
         <section class="detail-block">

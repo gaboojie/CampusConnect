@@ -19,7 +19,13 @@
   {/if}
 
   <div class="resource-card-body">
-    <span class="badge">{resource.category.name}</span>
+    <div class="resource-card-badges">
+      <span class="badge">{resource.category.name}</span>
+      {#if resource.isUnderMaintenance}
+        <span class="badge maintenance-badge">Maintenance</span>
+      {/if}
+    </div>
+
     <h3>{resource.name}</h3>
     <p class="resource-card-meta">{resource.building.name} · Seats {resource.capacity}</p>
     <p class="resource-card-description">{resource.shortDescription}</p>

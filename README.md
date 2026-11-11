@@ -44,6 +44,8 @@ _Authors: Faria Binta Awal, Ashwaq Alaklabi, Rokeshuvaraj Nagarajan, & Gabriel J
    npm run worker:dev
    ```
 
+   This builds the frontend assets before starting Wrangler.
+
 9. Open `http://localhost:8787/` to view the locally-hosted web application.
 
 Run project checks with:

@@ -67,6 +67,7 @@ export type ResourceSummary = {
   averageRating: number | null;
   reviewCount: number;
   thumbnailUrl: string | null;
+  isUnderMaintenance?: boolean;
 };
 
 export type ResourceSearchResult = {
@@ -429,7 +430,14 @@ export function buildResourceSearchQueries(search: ResourceSearch): {
           b.building_name,
           img.image_id,
           rating.average_rating,
-          COALESCE(rating.review_count, 0) AS review_count
+          COALESCE(rating.review_count, 0) AS review_count,
+          EXISTS (
+            SELECT 1
+            FROM "MaintenancePeriod" AS mp
+            WHERE mp.resource_id = r.resource_id
+              AND mp.start_time <= ${CAMPUS_NOW_SQL}
+              AND mp.end_time > ${CAMPUS_NOW_SQL}
+          ) AS is_under_maintenance
         FROM "Resource" AS r
         JOIN "ResourceCategory" AS c ON c.category_id = r.category_id
         JOIN "Building" AS b ON b.building_id = r.building_id
@@ -463,6 +471,7 @@ type ResourceSummaryRow = {
   average_rating: number | string | null;
   review_count: number | string;
   image_id: number | null;
+  is_under_maintenance?: boolean;
 };
 
 function toNumberOrNull(value: number | string | null | undefined): number | null {
@@ -503,6 +512,7 @@ export async function searchResources(
       averageRating: toNumberOrNull(row.average_rating),
       reviewCount: Number(row.review_count),
       thumbnailUrl: row.image_id == null ? null : resourceImageUrl(row.image_id),
+      ...(row.is_under_maintenance ? { isUnderMaintenance: true } : {}),
     })),
     total: Number(countResult.rows[0]?.total ?? 0),
     limit: search.limit,
