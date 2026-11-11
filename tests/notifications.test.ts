@@ -85,6 +85,7 @@ function workflowStep() {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -106,6 +107,9 @@ describe("notification email delivery", () => {
   });
 
   it("marks a notification sent only after the workflow wait and eligibility check", async () => {
+    // Pin "now" before the fixture's scheduled_for_utc so the workflow must sleep.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-30T12:00:00.000Z"));
     const database = databaseFor();
     const step = workflowStep();
     const fetch = vi.fn(async () => new Response("{}", { status: 200 }));

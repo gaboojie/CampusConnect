@@ -1,4 +1,4 @@
-export type RouteId = 'profile' | 'resources' | 'reservations' | 'listings' | 'notifications' | 'announcements'
+export type RouteId = 'profile' | 'resources' | 'reservations' | 'credits' | 'listings' | 'notifications' | 'announcements'
 
 export type AppRoute = {
   id: RouteId
@@ -29,6 +29,17 @@ export const routes: AppRoute[] = [
     label: 'My Reservations',
     description: 'View, edit, and cancel your upcoming and past reservations.',
     icon: ['M5 6.5h14v13H5Z', 'M5 10.5h14', 'M9 4v4', 'M15 4v4'],
+  },
+  {
+    id: 'credits',
+    label: 'My Credits',
+    description: 'Your credit balance and the history of credits spent, refunded, and received.',
+    icon: [
+      'M12 3.75a8.25 8.25 0 1 1 0 16.5a8.25 8.25 0 1 1 0-16.5Z',
+      'M14.5 9.5c-.35-.95-1.3-1.6-2.5-1.6-1.45 0-2.5.8-2.5 1.95 0 2.65 5 1.45 5 4.2 0 1.15-1.05 1.95-2.5 1.95-1.2 0-2.15-.65-2.5-1.6',
+      'M12 6.4v1.5',
+      'M12 16v1.6',
+    ],
   },
   {
     id: 'listings',

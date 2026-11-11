@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import Sidebar from './Sidebar.svelte'
   import AnnouncementsSection from './sections/AnnouncementsSection.svelte'
+  import CreditsSection from './sections/CreditsSection.svelte'
   import ListingsSection from './sections/ListingsSection.svelte'
   import ListingDetailSection from './sections/ListingDetailSection.svelte'
   import PlaceholderSection from './sections/PlaceholderSection.svelte'
@@ -103,7 +104,7 @@
     {#if user.isBanned || route.id === 'profile'}
       <ProfileSection {user} {submitting} {onLogout} {onAccountDeleted} {onUserUpdated} />
     {:else if route.id === 'resources' && location.subpath}
-      <ResourceDetailSection resourceId={location.subpath} backQuery={location.query} />
+      <ResourceDetailSection resourceId={location.subpath} backQuery={location.query} {user} {onUserUpdated} />
     {:else if route.id === 'resources'}
       <ResourcesSection query={location.query} />
     {:else if route.id === 'listings' && location.subpath}
@@ -111,7 +112,9 @@
     {:else if route.id === 'listings'}
       <ListingsSection {user} />
     {:else if route.id === 'reservations'}
-      <ReservationsSection />
+      <ReservationsSection {user} {onUserUpdated} />
+    {:else if route.id === 'credits'}
+      <CreditsSection {user} {onUserUpdated} />
     {:else if route.id === 'announcements'}
       <AnnouncementsSection />
     {:else}

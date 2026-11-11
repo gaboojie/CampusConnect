@@ -1,8 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { hashSessionToken } from "../backend/auth";
 import type { DatabaseClient, DatabaseQueryResult } from "../db/client";
 import { createApp } from "../backend/index";
 import { LOCK_RESOURCE_SQL, LOCK_USER_SQL } from "../db/repositories/reservations";
+import {
+  CHARGE_RESERVATION_SQL,
+  FIND_RESERVATION_CHARGE_SQL,
+  PAIRING_STAMP_TAKEN_SQL,
+  REFUND_CREDITS_SQL,
+} from "../db/repositories/credits";
 
 // Times are local campus "YYYY-MM-DD HH:MM" strings, which compare correctly as text.
 const NOW = "2026-10-14 12:00";
@@ -14,11 +20,22 @@ type FakeReservation = {
   start: string;
   end: string;
   status: string;
+  // Stands in for the microsecond created_at timestamp used to pair charges.
+  createdAt: string;
+};
+
+type FakeCreditTransaction = {
+  id: number;
+  userId: number;
+  amount: number;
+  type: string;
+  createdAt: string;
 };
 
 type FakeResource = {
   name: string;
   maxMinutes: number | null;
+  requiredCredits: number;
   // Daily availability window.
   opensAt: string;
   closesAt: string;
@@ -27,6 +44,12 @@ type FakeResource = {
 const normalize = (text: string) => text.replace(/\s+/g, " ").trim();
 const LOCK_RESOURCE = normalize(LOCK_RESOURCE_SQL);
 const LOCK_USER = normalize(LOCK_USER_SQL);
+const STAMP_TAKEN = normalize(PAIRING_STAMP_TAKEN_SQL);
+const CHARGE = normalize(CHARGE_RESERVATION_SQL);
+const FIND_CHARGE = normalize(FIND_RESERVATION_CHARGE_SQL);
+const REFUND = normalize(REFUND_CREDITS_SQL);
+const HOUR_MS = 60 * 60 * 1000;
+const epoch = (stamp: string) => Date.parse(`${stamp.replace(" ", "T")}:00Z`);
 
 const toMinutes = (stamp: string) => {
   const [hours, minutes] = stamp.slice(-5).split(":").map(Number);
@@ -44,9 +67,17 @@ class FakeReservationDatabase {
   sessions = new Map<string, number>();
   bannedUsers = new Set<number>();
   resources = new Map<number, FakeResource>([
-    [1, { name: "Newman Group Study Room 1", maxMinutes: 120, opensAt: "08:00", closesAt: "23:00" }],
-    [2, { name: "Squires Meeting Room B", maxMinutes: null, opensAt: "08:00", closesAt: "23:00" }],
+    [1, { name: "Newman Group Study Room 1", maxMinutes: 120, requiredCredits: 2, opensAt: "08:00", closesAt: "23:00" }],
+    [2, { name: "Squires Meeting Room B", maxMinutes: null, requiredCredits: 3, opensAt: "08:00", closesAt: "23:00" }],
   ]);
+  balances = new Map<number, number>([[6, 20], [7, 20]]);
+  credits: FakeCreditTransaction[] = [];
+  nextTransactionId = 500;
+  // Every transaction gets its own "CURRENT_TIMESTAMP" unless this forces one.
+  fixedStamp: string | null = null;
+  // Makes the user lock report a different balance than the one the charge sees.
+  lockReportsBalance: number | null = null;
+  private stampCount = 0;
   maintenance: Array<{ resourceId: number; start: string; end: string }> = [];
   reservations: FakeReservation[] = [];
   nextId = 100;
@@ -63,10 +94,41 @@ class FakeReservationDatabase {
     this.sessions.set(await hashSessionToken(token), userId);
   }
 
-  addReservation(reservation: Omit<FakeReservation, "id"> & { id?: number }) {
-    const row = { id: reservation.id ?? this.nextId++, ...reservation };
+  addReservation(reservation: Omit<FakeReservation, "id" | "createdAt"> & { id?: number; createdAt?: string }) {
+    const id = reservation.id ?? this.nextId++;
+    const row = { ...reservation, id, createdAt: reservation.createdAt ?? `legacy-${id}` };
     this.reservations.push(row);
     return row;
+  }
+
+  // Records the charge a booking would have written (balance already reflects it).
+  addCharge(reservation: FakeReservation, credits: number) {
+    this.credits.push({
+      id: this.nextTransactionId++,
+      userId: reservation.userId,
+      amount: -credits,
+      type: "reservation_charge",
+      createdAt: reservation.createdAt,
+    });
+  }
+
+  creditsOf(userId: number, type?: string) {
+    return this.credits.filter((row) => row.userId === userId && (!type || row.type === type));
+  }
+
+  private pairedCharge(reservation: FakeReservation) {
+    const charges = this.credits.filter(
+      (row) => row.userId === reservation.userId && row.type === "reservation_charge" && row.createdAt === reservation.createdAt,
+    );
+    const twins = this.reservations.filter(
+      (row) => row.userId === reservation.userId && row.createdAt === reservation.createdAt,
+    );
+    return {
+      charge_count: charges.length,
+      charge_credits: charges.length ? -Math.min(...charges.map((row) => row.amount)) : null,
+      reservation_count: twins.length,
+      paired: charges.length === 1 && twins.length === 1 && charges[0].amount < 0 ? -charges[0].amount : null,
+    };
   }
 
   // Queries sent by the first request's endpoint client. The session lookup runs
@@ -87,9 +149,11 @@ class FakeReservationDatabase {
     return release;
   }
 
-  private row(reservation: FakeReservation) {
+  private row(reservation: FakeReservation, options: { seeCharge?: boolean } = {}) {
     const resource = this.resources.get(reservation.resourceId)!;
     return {
+      refund_window_open: epoch(reservation.start) - epoch(NOW) >= 24 * HOUR_MS,
+      credits_charged: options.seeCharge === false ? null : this.pairedCharge(reservation).paired,
       reservation_id: reservation.id,
       status: reservation.status,
       start_time: iso(reservation.start),
@@ -138,6 +202,19 @@ class FakeReservationDatabase {
     const releaseAll = () => {
       while (held.length) held.pop()!();
     };
+    // Undo log for the open transaction, replayed in reverse on ROLLBACK.
+    let undo: Array<() => void> = [];
+    let stamp = "";
+    const setBalance = (userId: number, value: number) => {
+      const previous = this.balances.get(userId)!;
+      undo.push(() => this.balances.set(userId, previous));
+      this.balances.set(userId, value);
+    };
+    const pushCredit = (row: Omit<FakeCreditTransaction, "id">) => {
+      const entry = { id: this.nextTransactionId++, ...row };
+      this.credits.push(entry);
+      undo.push(() => this.credits.splice(this.credits.indexOf(entry), 1));
+    };
 
     const run = async (query: string, values: readonly unknown[]): Promise<unknown[]> => {
       if (query.startsWith("SELECT u.user_id")) {
@@ -162,20 +239,58 @@ class FakeReservationDatabase {
       // Yield so parallel requests interleave query by query.
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      if (query === "BEGIN") return [];
+      if (query === "BEGIN") {
+        undo = [];
+        stamp = this.fixedStamp ?? `stamp-${++this.stampCount}`;
+        return [];
+      }
       if (query === "COMMIT" || query === "ROLLBACK") {
+        if (query === "ROLLBACK") while (undo.length) undo.pop()!();
+        undo = [];
         releaseAll();
         return [];
       }
       if (query === LOCK_RESOURCE) {
         const id = values[0] as number;
         if (this.locksEnabled) held.push(await this.acquire(`resource:${id}`));
-        return this.resources.has(id) ? [{ resource_id: id }] : [];
+        const resource = this.resources.get(id);
+        return resource ? [{ resource_id: id, required_credits: resource.requiredCredits }] : [];
       }
       if (query === LOCK_USER) {
         const id = values[0] as number;
         if (this.locksEnabled) held.push(await this.acquire(`user:${id}`));
-        return [{ is_banned: this.bannedUsers.has(id) }];
+        return [{ is_banned: this.bannedUsers.has(id), credit_balance: this.lockReportsBalance ?? this.balances.get(id) }];
+      }
+      if (query === STAMP_TAKEN) {
+        const userId = values[0] as number;
+        const taken =
+          this.reservations.some((row) => row.userId === userId && row.createdAt === stamp) ||
+          this.credits.some((row) => row.userId === userId && row.type === "reservation_charge" && row.createdAt === stamp);
+        return [{ taken }];
+      }
+      if (query === CHARGE) {
+        const [userId, credits, reservationId] = values as [number, number, number];
+        const balance = this.balances.get(userId)!;
+        // The guarded UPDATE is evaluated against the current balance.
+        if (balance < credits) return [];
+        setBalance(userId, balance - credits);
+        const reservation = this.reservations.find((row) => row.id === reservationId && row.userId === userId);
+        if (!reservation) return [];
+        pushCredit({ userId, amount: -credits, type: "reservation_charge", createdAt: reservation.createdAt });
+        return [{ balance_after: balance - credits }];
+      }
+      if (query === FIND_CHARGE) {
+        const reservation = this.reservations.find((row) => row.id === values[0]);
+        if (!reservation) return [];
+        const { paired: _paired, ...match } = this.pairedCharge(reservation);
+        return [match];
+      }
+      if (query === REFUND) {
+        const [userId, credits] = values as [number, number];
+        const balance = this.balances.get(userId)! + credits;
+        setBalance(userId, balance);
+        pushCredit({ userId, amount: credits, type: "refund", createdAt: stamp });
+        return [{ balance_after: balance }];
       }
       if (query.startsWith("SELECT $2::timestamp >")) {
         return this.checks(values);
@@ -187,16 +302,23 @@ class FakeReservationDatabase {
         const reservation = byId(values[0]);
         return reservation ? [{ user_id: reservation.userId, resource_id: reservation.resourceId }] : [];
       }
-      if (query.startsWith("SELECT status, start_time <=") || query.startsWith("SELECT user_id, status, start_time <=")) {
+      if (query.startsWith("SELECT status, start_time <=")) {
         const reservation = byId(values[0]);
         if (reservation && this.locksEnabled) held.push(await this.acquire(`reservation:${reservation.id}`));
         return reservation
-          ? [{ user_id: reservation.userId, status: reservation.status, started: reservation.start <= NOW }]
+          ? [{
+              status: reservation.status,
+              started: reservation.start <= NOW,
+              refund_window_open: epoch(reservation.start) - epoch(NOW) >= 24 * HOUR_MS,
+            }]
           : [];
       }
       if (query.includes('INSERT INTO "Reservation"')) {
         const [userId, resourceId, start, end] = values as [number, number, string, string];
-        return [this.row(this.addReservation({ userId, resourceId, start, end, status: "confirmed" }))];
+        const reservation = this.addReservation({ userId, resourceId, start, end, status: "confirmed", createdAt: stamp });
+        undo.push(() => this.reservations.splice(this.reservations.indexOf(reservation), 1));
+        // The INSERT's own select cannot see a charge written by a later statement.
+        return [this.row(reservation, { seeCharge: false })];
       }
       if (query.includes('INSERT INTO "Notification"')) {
         return [{ notification_id: this.nextNotificationId++ }];
@@ -206,12 +328,16 @@ class FakeReservationDatabase {
       }
       if (query.includes("SET start_time = $2::timestamp")) {
         const reservation = byId(values[0])!;
+        const previous = { start: reservation.start, end: reservation.end };
+        undo.push(() => Object.assign(reservation, previous));
         reservation.start = values[1] as string;
         reservation.end = values[2] as string;
         return [this.row(reservation)];
       }
       if (query.includes("SET status = 'cancelled'")) {
         const reservation = byId(values[0])!;
+        if (reservation.status !== "confirmed") return [];
+        undo.push(() => (reservation.status = "confirmed"));
         reservation.status = "cancelled";
         return [this.row(reservation)];
       }
@@ -319,7 +445,10 @@ describe("POST /api/reservations", () => {
         status: "confirmed",
         createdAt: "2026-10-10T09:00:00",
         canModify: true,
+        creditsCharged: 2,
+        refundEligible: true,
       },
+      credits: { charged: 2, refunded: 0, balance: 18 },
     });
 
     const queries = database.queries();
@@ -327,23 +456,17 @@ describe("POST /api/reservations", () => {
     expect(queries[1]).toBe(LOCK_RESOURCE);
     expect(queries[2]).toBe(LOCK_USER);
     expect(queries[3]).toMatch(/^SELECT \$2::timestamp >/);
-    expect(queries[4]).toMatch(/INSERT INTO "Reservation"/);
-    expect(queries[4]).toMatch(/'confirmed'/);
-    expect(queries[7]).toBe("COMMIT");
-    expect(queries[5]).toMatch(/INSERT INTO "Notification"/);
-    expect(database.log[5].values[1]).toBe("reservation_reminder");
-    expect(queries[6]).toMatch(/UPDATE "Notification"/);
-    expect(queries).toHaveLength(8);
+    expect(queries[4]).toBe(STAMP_TAKEN);
+    expect(queries[5]).toMatch(/INSERT INTO "Reservation"/);
+    expect(queries[5]).toMatch(/'confirmed'/);
+    expect(queries[6]).toBe(CHARGE);
+    expect(queries[7]).toMatch(/INSERT INTO "Notification"/);
+    expect(database.log[7].values[1]).toBe("reservation_reminder");
+    expect(queries[8]).toMatch(/UPDATE "Notification"/);
+    expect(queries[9]).toBe("COMMIT");
+    expect(queries).toHaveLength(10);
     expect(database.log[3].values).toEqual([1, "2026-10-20 10:00", "2026-10-20 11:00", MAYA]);
-  });
-
-  it("never touches credits", async () => {
-    const { database, request } = await setup();
-    await request("POST", "/api/reservations", { resourceId: 1, ...slot });
-
-    for (const { text } of database.log) {
-      expect(text).not.toMatch(/CreditTransaction|credit_balance/);
-    }
+    expect(database.log[6].values).toEqual([MAYA, 2, 100]);
   });
 
   it.each([
@@ -625,9 +748,13 @@ describe("POST /api/reservations/:id/cancel", () => {
     expect(database.reservations).toHaveLength(1);
 
     const queries = database.queries();
+    const lockAt = queries.findIndex((text) => /FROM "Reservation" WHERE reservation_id = \$1 FOR UPDATE$/.test(text));
     expect(queries[0]).toBe("BEGIN");
-    expect(queries[1]).toMatch(/FROM "Reservation" WHERE reservation_id = \$1 FOR UPDATE$/);
-    expect(queries[2]).toMatch(/SET status = 'cancelled'/);
+    expect(queries[1]).toMatch(/^SELECT user_id, resource_id FROM "Reservation"/);
+    expect(queries[2]).toBe(LOCK_RESOURCE);
+    expect(queries[3]).toBe(LOCK_USER);
+    expect(lockAt).toBe(4);
+    expect(queries[5]).toMatch(/SET status = 'cancelled' WHERE reservation_id = \$1 AND status = 'confirmed'/);
     expect(queries.some((text) => text.includes("email_status = 'skipped'"))).toBe(true);
     expect(database.log.some((entry) => entry.values.includes("reservation_cancelled"))).toBe(true);
     expect(queries.join(" ")).not.toMatch(/DELETE/);
@@ -700,6 +827,8 @@ describe("GET /api/reservations/mine", () => {
       status: "confirmed",
       createdAt: "2026-10-10T09:00:00",
       canModify: true,
+      creditsCharged: null,
+      refundEligible: false,
     });
     expect(database.log[0].values).toEqual([MAYA]);
   });
@@ -708,5 +837,374 @@ describe("GET /api/reservations/mine", () => {
     const { database, request } = await setup();
     database.failOn = () => true;
     await expectRejected(await request("GET", "/api/reservations/mine"), 503, /Unable to load/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Credits
+// ---------------------------------------------------------------------------
+
+type CreditBody = {
+  reservation: { id: number; status: string; creditsCharged: number | null; refundEligible: boolean };
+  credits: { charged: number; refunded: number; balance: number; refundStatus?: string };
+};
+
+const otherSlot = { date: "2026-10-21", start: "10:00", end: "11:00" };
+const isCreditWrite = (text: string) => text === CHARGE || text === REFUND;
+const cancellationMessage = (database: FakeReservationDatabase) =>
+  database.log.find((entry) => entry.values.includes("reservation_cancelled"))?.values[2] as string | undefined;
+
+describe("booking charges", () => {
+  it("deducts the resource's credits once and pairs the charge with the reservation", async () => {
+    const { database, request } = await setup();
+    const response = await request("POST", "/api/reservations", { resourceId: 2, ...slot });
+
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as CreditBody;
+    expect(body.credits).toEqual({ charged: 3, refunded: 0, balance: 17 });
+    expect(body.reservation.creditsCharged).toBe(3);
+    expect(database.balances.get(MAYA)).toBe(17);
+
+    const charges = database.creditsOf(MAYA);
+    expect(charges).toHaveLength(1);
+    expect(charges[0]).toMatchObject({ amount: -3, type: "reservation_charge" });
+    // Same transaction timestamp as the reservation: this is the pairing key.
+    expect(charges[0].createdAt).toBe(database.reservations[0].createdAt);
+  });
+
+  it("allows a booking that uses the exact remaining balance", async () => {
+    const { database, request } = await setup();
+    database.balances.set(MAYA, 2);
+
+    expect((await request("POST", "/api/reservations", { resourceId: 1, ...slot })).status).toBe(201);
+    expect(database.balances.get(MAYA)).toBe(0);
+  });
+
+  it("returns 409 for insufficient credits, rolls back, and writes nothing", async () => {
+    const { database, request } = await setup();
+    database.balances.set(MAYA, 1);
+
+    await expectRejected(
+      await request("POST", "/api/reservations", { resourceId: 1, ...slot }),
+      409,
+      /costs 2 credits, but you have 1 credit\./,
+    );
+    expect(database.queries().at(-1)).toBe("ROLLBACK");
+    expect(database.queries().some(isWrite)).toBe(false);
+    expect(database.reservations).toEqual([]);
+    expect(database.credits).toEqual([]);
+    expect(database.balances.get(MAYA)).toBe(1);
+  });
+
+  it("reports a slot problem before a credit problem", async () => {
+    const { database, request } = await setup();
+    database.balances.set(MAYA, 0);
+
+    await expectRejected(
+      await request("POST", "/api/reservations", { resourceId: 1, ...slot, start: "06:00", end: "07:00" }),
+      409,
+      /isn't open/,
+    );
+  });
+
+  it.each([
+    ["the charge", (query: string) => query === CHARGE],
+    ["the reminder notification after the charge", (query: string) => query.includes('INSERT INTO "Notification"')],
+  ])("rolls back the reservation and the charge when %s fails", async (_name, failOn) => {
+    const { database, request } = await setup();
+    database.failOn = failOn;
+
+    await expectRejected(await request("POST", "/api/reservations", { resourceId: 1, ...slot }), 503, /Unable to save/);
+    expect(database.queries().at(-1)).toBe("ROLLBACK");
+    expect(database.reservations).toEqual([]);
+    expect(database.credits).toEqual([]);
+    expect(database.balances.get(MAYA)).toBe(20);
+  });
+
+  it("rolls back when the guarded charge writes nothing", async () => {
+    const { database, request } = await setup();
+    // The balance check passes, but the guarded UPDATE sees too few credits.
+    database.balances.set(MAYA, 1);
+    database.lockReportsBalance = 20;
+
+    expect((await request("POST", "/api/reservations", { resourceId: 1, ...slot })).status).toBe(503);
+    expect(database.queries().at(-1)).toBe("ROLLBACK");
+    expect(database.reservations).toEqual([]);
+    expect(database.credits).toEqual([]);
+    expect(database.balances.get(MAYA)).toBe(1);
+  });
+
+  it("refuses a second booking that would reuse the same pairing timestamp", async () => {
+    const { database, request } = await setup();
+    database.fixedStamp = "same-microsecond";
+
+    expect((await request("POST", "/api/reservations", { resourceId: 1, ...slot })).status).toBe(201);
+    await expectRejected(
+      await request("POST", "/api/reservations", { resourceId: 1, ...otherSlot }),
+      409,
+      /at the same moment/,
+    );
+    expect(database.reservations).toHaveLength(1);
+    expect(database.creditsOf(MAYA)).toHaveLength(1);
+    expect(database.balances.get(MAYA)).toBe(18);
+  });
+
+  it("does not move credits when a reservation is rescheduled", async () => {
+    const { database, request } = await setup();
+    await request("POST", "/api/reservations", { resourceId: 1, ...slot });
+    database.log = [];
+
+    const response = await request("PATCH", `/api/reservations/${database.reservations[0].id}`, otherSlot);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as CreditBody;
+    expect(body.credits).toBeUndefined();
+    expect(body.reservation.creditsCharged).toBe(2);
+    expect(database.log.some((entry) => isCreditWrite(entry.text))).toBe(false);
+    expect(database.balances.get(MAYA)).toBe(18);
+    expect(database.credits).toHaveLength(1);
+  });
+
+  it("charges the resource owner and administrators like everyone else", async () => {
+    // The booking path has no owner or role exemption: every user is charged.
+    const { database, request } = await setup();
+    await request("POST", "/api/reservations", { resourceId: 1, ...slot }, liamHeaders);
+    expect(database.balances.get(LIAM)).toBe(18);
+  });
+});
+
+describe("concurrent credit spending", () => {
+  it("lets only one of two parallel bookings spend the last credits", async () => {
+    const { database, request } = await setup();
+    database.balances.set(MAYA, 2);
+
+    const responses = await Promise.all([
+      request("POST", "/api/reservations", { resourceId: 1, ...slot }),
+      request("POST", "/api/reservations", { resourceId: 1, ...otherSlot }),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+    expect(database.balances.get(MAYA)).toBe(0);
+    expect(database.reservations).toHaveLength(1);
+    expect(database.creditsOf(MAYA, "reservation_charge")).toHaveLength(1);
+  });
+
+  it("spends credits correctly across five parallel bookings of different resources", async () => {
+    const { database, request } = await setup();
+    database.balances.set(MAYA, 7);
+    const slots = ["10:00", "11:00", "12:00", "13:00", "14:00"].map((start, index) => ({
+      resourceId: index % 2 ? 2 : 1,
+      date: `2026-10-2${index}`,
+      start,
+      end: `${Number(start.slice(0, 2)) + 1}:00`,
+    }));
+
+    const responses = await Promise.all(slots.map((body) => request("POST", "/api/reservations", body)));
+    const created = responses.filter((response) => response.status === 201).length;
+
+    const spent = database.creditsOf(MAYA, "reservation_charge").reduce((sum, row) => sum - row.amount, 0);
+    expect(created).toBeGreaterThanOrEqual(2);
+    expect(created).toBe(database.reservations.length);
+    expect(database.balances.get(MAYA)).toBe(7 - spent);
+    expect(database.balances.get(MAYA)).toBeGreaterThanOrEqual(0);
+    expect(responses.filter((response) => response.status === 409)).toHaveLength(5 - created);
+  });
+
+  it("still never overspends without the row locks, because the charge is guarded", async () => {
+    const { database, request } = await setup();
+    database.balances.set(MAYA, 2);
+    database.locksEnabled = false;
+
+    const responses = await Promise.all([
+      request("POST", "/api/reservations", { resourceId: 1, ...slot }),
+      request("POST", "/api/reservations", { resourceId: 1, ...otherSlot }),
+    ]);
+
+    // Both passed the unlocked balance check; the guarded UPDATE stopped one.
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 503]);
+    expect(database.balances.get(MAYA)).toBe(0);
+    expect(database.reservations).toHaveLength(1);
+  });
+});
+
+describe("cancellation refunds", () => {
+  async function chargedReservation(start: string, credits = 2) {
+    const context = await setup();
+    const reservation = context.database.addReservation({
+      userId: MAYA,
+      resourceId: 1,
+      start,
+      end: `${start.slice(0, 11)}${String(Number(start.slice(11, 13)) + 1).padStart(2, "0")}:00`,
+      status: "confirmed",
+    });
+    context.database.addCharge(reservation, credits);
+    context.database.balances.set(MAYA, 20 - credits);
+    return { ...context, reservation };
+  }
+
+  it("refunds the full charge when cancelled more than 24 hours ahead", async () => {
+    const { database, request, reservation } = await chargedReservation("2026-10-20 10:00");
+    const response = await request("POST", `/api/reservations/${reservation.id}/cancel`);
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as CreditBody;
+    expect(body.credits).toEqual({ charged: 0, refunded: 2, balance: 20, refundStatus: "refunded" });
+    expect(database.balances.get(MAYA)).toBe(20);
+    expect(database.creditsOf(MAYA, "refund")).toEqual([
+      expect.objectContaining({ amount: 2, type: "refund" }),
+    ]);
+    expect(cancellationMessage(database)).toMatch(/2 credits refunded\.$/);
+  });
+
+  it("refunds a cancellation exactly 24 hours before the start", async () => {
+    const { database, request, reservation } = await chargedReservation("2026-10-15 12:00");
+    const body = (await (await request("POST", `/api/reservations/${reservation.id}/cancel`)).json()) as CreditBody;
+
+    expect(body.credits.refundStatus).toBe("refunded");
+    expect(database.balances.get(MAYA)).toBe(20);
+  });
+
+  it("does not refund a cancellation less than 24 hours before the start", async () => {
+    const { database, request, reservation } = await chargedReservation("2026-10-15 11:45");
+    const response = await request("POST", `/api/reservations/${reservation.id}/cancel`);
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as CreditBody;
+    expect(body.reservation.status).toBe("cancelled");
+    expect(body.credits).toEqual({ charged: 0, refunded: 0, balance: 18, refundStatus: "late" });
+    expect(database.creditsOf(MAYA, "refund")).toEqual([]);
+    expect(database.queries()).not.toContain(FIND_CHARGE);
+    expect(cancellationMessage(database)).toMatch(/less than 24 hours before the start time are not refunded/);
+  });
+
+  it("refunds what was paid even if the owner changed the price afterwards", async () => {
+    const { database, request, reservation } = await chargedReservation("2026-10-20 10:00", 2);
+    database.resources.get(1)!.requiredCredits = 9;
+
+    await request("POST", `/api/reservations/${reservation.id}/cancel`);
+    expect(database.creditsOf(MAYA, "refund")[0].amount).toBe(2);
+  });
+
+  it("does not refund a legacy reservation that was never charged", async () => {
+    const { database, request } = await setup();
+    const { id } = database.addReservation({ userId: MAYA, resourceId: 1, start: "2026-10-20 10:00", end: "2026-10-20 11:00", status: "confirmed" });
+
+    const body = (await (await request("POST", `/api/reservations/${id}/cancel`)).json()) as CreditBody;
+    expect(body.reservation.status).toBe("cancelled");
+    expect(body.credits).toEqual({ charged: 0, refunded: 0, balance: 20, refundStatus: "not_charged" });
+    expect(database.credits).toEqual([]);
+    expect(database.queries()).not.toContain(REFUND);
+    expect(cancellationMessage(database)).toMatch(/No credits were charged for this booking/);
+  });
+
+  it("does not guess when two reservations share the charge's timestamp", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { database, request } = await setup();
+    const first = database.addReservation({ userId: MAYA, resourceId: 1, start: "2026-10-20 10:00", end: "2026-10-20 11:00", status: "confirmed", createdAt: "shared" });
+    database.addReservation({ userId: MAYA, resourceId: 2, start: "2026-10-22 10:00", end: "2026-10-22 11:00", status: "confirmed", createdAt: "shared" });
+    database.addCharge(first, 2);
+
+    const body = (await (await request("POST", `/api/reservations/${first.id}/cancel`)).json()) as CreditBody;
+    expect(body.credits.refundStatus).toBe("unverified");
+    expect(database.creditsOf(MAYA, "refund")).toEqual([]);
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/refund skipped for reservation/));
+    expect(cancellationMessage(database)).toMatch(/could not be verified automatically/);
+    warn.mockRestore();
+  });
+
+  it("does not guess when two charges share the reservation's timestamp", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { database, request, reservation } = await chargedReservation("2026-10-20 10:00");
+    database.addCharge(reservation, 2);
+
+    const body = (await (await request("POST", `/api/reservations/${reservation.id}/cancel`)).json()) as CreditBody;
+    expect(body.credits.refundStatus).toBe("unverified");
+    expect(database.creditsOf(MAYA, "refund")).toEqual([]);
+    warn.mockRestore();
+  });
+
+  it("never matches another user's charge", async () => {
+    const { database, request } = await setup();
+    const mine = database.addReservation({ userId: MAYA, resourceId: 1, start: "2026-10-20 10:00", end: "2026-10-20 11:00", status: "confirmed", createdAt: "t1" });
+    const theirs = database.addReservation({ userId: LIAM, resourceId: 2, start: "2026-10-20 10:00", end: "2026-10-20 11:00", status: "confirmed", createdAt: "t1" });
+    database.addCharge(theirs, 3);
+
+    const body = (await (await request("POST", `/api/reservations/${mine.id}/cancel`)).json()) as CreditBody;
+    expect(body.credits.refundStatus).toBe("not_charged");
+    expect(database.balances.get(MAYA)).toBe(20);
+  });
+
+  it("refunds once when the same reservation is cancelled twice", async () => {
+    const { database, request, reservation } = await chargedReservation("2026-10-20 10:00");
+
+    expect((await request("POST", `/api/reservations/${reservation.id}/cancel`)).status).toBe(200);
+    await expectRejected(await request("POST", `/api/reservations/${reservation.id}/cancel`), 409, /has been cancelled/);
+    expect(database.creditsOf(MAYA, "refund")).toHaveLength(1);
+    expect(database.balances.get(MAYA)).toBe(20);
+  });
+
+  it("refunds once when two cancel requests race", async () => {
+    const { database, request, reservation } = await chargedReservation("2026-10-20 10:00");
+
+    const responses = await Promise.all([
+      request("POST", `/api/reservations/${reservation.id}/cancel`),
+      request("POST", `/api/reservations/${reservation.id}/cancel`),
+      request("POST", `/api/reservations/${reservation.id}/cancel`),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409, 409]);
+    expect(database.creditsOf(MAYA, "refund")).toHaveLength(1);
+    expect(database.balances.get(MAYA)).toBe(20);
+  });
+
+  it("rolls back the cancellation and the refund together", async () => {
+    const { database, request, reservation } = await chargedReservation("2026-10-20 10:00");
+    database.failOn = (query) => query.includes('INSERT INTO "Notification"');
+
+    expect((await request("POST", `/api/reservations/${reservation.id}/cancel`)).status).toBe(503);
+    expect(reservation.status).toBe("confirmed");
+    expect(database.creditsOf(MAYA, "refund")).toEqual([]);
+    expect(database.balances.get(MAYA)).toBe(18);
+  });
+
+  it("takes the resource, user, then reservation locks before cancelling", async () => {
+    const { database, request, reservation } = await chargedReservation("2026-10-20 10:00");
+    await request("POST", `/api/reservations/${reservation.id}/cancel`);
+
+    const queries = database.queries();
+    const reservationLock = queries.findIndex((text) => text.startsWith("SELECT status, start_time <="));
+    expect(queries.indexOf(LOCK_RESOURCE)).toBeLessThan(queries.indexOf(LOCK_USER));
+    expect(queries.indexOf(LOCK_USER)).toBeLessThan(reservationLock);
+    expect(reservationLock).toBeLessThan(queries.indexOf(REFUND));
+  });
+
+  it("books, cancels, and rebooks with a consistent balance and history", async () => {
+    const { database, request } = await setup();
+    await request("POST", "/api/reservations", { resourceId: 2, ...slot });
+    await request("POST", `/api/reservations/${database.reservations[0].id}/cancel`);
+    await request("POST", "/api/reservations", { resourceId: 2, ...slot });
+
+    const history = database.creditsOf(MAYA).map((row) => [row.type, row.amount]);
+    expect(history).toEqual([["reservation_charge", -3], ["refund", 3], ["reservation_charge", -3]]);
+    expect(database.balances.get(MAYA)).toBe(20 + history.reduce((sum, [, amount]) => sum + (amount as number), 0));
+  });
+});
+
+describe("reservation list credit fields", () => {
+  it("reports the paid credits and whether cancelling now would be refunded", async () => {
+    const { database, request } = await setup();
+    const charged = database.addReservation({ id: 1, userId: MAYA, resourceId: 1, start: "2026-10-20 10:00", end: "2026-10-20 11:00", status: "confirmed" });
+    const late = database.addReservation({ id: 2, userId: MAYA, resourceId: 2, start: "2026-10-15 09:00", end: "2026-10-15 10:00", status: "confirmed" });
+    database.addReservation({ id: 3, userId: MAYA, resourceId: 1, start: "2026-10-22 10:00", end: "2026-10-22 11:00", status: "confirmed" });
+    database.addCharge(charged, 2);
+    database.addCharge(late, 3);
+
+    const body = (await (await request("GET", "/api/reservations/mine")).json()) as {
+      upcoming: Array<{ id: number; creditsCharged: number | null; refundEligible: boolean }>;
+    };
+    expect(body.upcoming.map(({ id, creditsCharged, refundEligible }) => ({ id, creditsCharged, refundEligible }))).toEqual([
+      { id: 2, creditsCharged: 3, refundEligible: false },
+      { id: 1, creditsCharged: 2, refundEligible: true },
+      { id: 3, creditsCharged: null, refundEligible: false },
+    ]);
   });
 });
