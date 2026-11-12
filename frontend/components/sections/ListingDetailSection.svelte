@@ -2,7 +2,7 @@
   import { onDestroy } from 'svelte'
   import { getJson, isAbortError, sendForm, sendJson } from '../../lib/api'
   import { formatClock, formatDate, formatDateTime, formatDuration, formatRating } from '../../lib/format'
-  import type { ListingDetails, ListingFormOptions, OwnerReservationReview, PublicUser, ResourceFilterOptions } from '../../lib/types'
+  import type { ListingDetails, ListingFormOptions, OwnerUserReview, PublicUser, ResourceFilterOptions } from '../../lib/types'
   import ResourceForm from '../resources/ResourceForm.svelte'
   import ReservationReviewForm from '../reservations/ReservationReviewForm.svelte'
 
@@ -20,10 +20,10 @@
   let deleteError = ''
   let controller: AbortController | undefined
   let image: ListingDetails['images'][number] | undefined
-  let reservationReviews: OwnerReservationReview[] = []
+  let reservationReviews: OwnerUserReview[] = []
   let reviewsLoading = true
   let reviewsError = ''
-  let reviewing: OwnerReservationReview | null = null
+  let reviewing: OwnerUserReview | null = null
 
   $: void load(listingId)
   $: image = listing?.images[0]
@@ -51,7 +51,7 @@
     reviewsLoading = true
     reviewsError = ''
     try {
-      const payload = await getJson<{ reservations: OwnerReservationReview[] }>(
+      const payload = await getJson<{ reservations: OwnerUserReview[] }>(
         `/api/listings/${encodeURIComponent(id)}/reservation-reviews`,
         signal,
       )
@@ -66,7 +66,7 @@
   }
 
   async function submitReview(input: { reservationId: number; rating: number; reason: string | null; isAnonymous: boolean }) {
-    const payload = await sendJson<{ reservation: OwnerReservationReview }>(
+    const payload = await sendJson<{ reservation: OwnerUserReview }>(
       'POST',
       `/api/listings/${encodeURIComponent(listingId)}/reservation-reviews`,
       input,

@@ -1,4 +1,4 @@
-// CampusConnect ER diagram (DBML), matching db/migrations/001-004.
+// CampusConnect ER diagram (DBML), matching db/migrations/001-005.
 // Paste into https://dbdiagram.io to render the diagram.
 // Docs: https://dbml.dbdiagram.io/docs
 
@@ -117,7 +117,7 @@ Table Notification {
   read_at timestamp [null, note: "NULL means unread"]
 }
 
-Table ReservationReview {
+Table UserReview {
   reservation_id integer [primary key]
   reviewer_user_id integer [not null]
   reviewee_user_id integer [not null]
@@ -129,6 +129,7 @@ Table ReservationReview {
 
 Table ResourceReview {
   review_id integer [primary key]
+  reservation_id integer [not null, unique]
   resource_id integer [not null]
   reviewer_user_id integer [not null]
   rating integer [not null]
@@ -180,11 +181,12 @@ Ref: Notification.reservation_id > Reservation.reservation_id [delete: cascade]
 
 Ref: EmailVerificationToken.user_id > User.user_id [delete: cascade]
 
-Ref: ReservationReview.reviewee_user_id > User.user_id
-Ref: ReservationReview.reviewer_user_id > User.user_id
+Ref: UserReview.reviewee_user_id > User.user_id
+Ref: UserReview.reviewer_user_id > User.user_id
 
-Ref: Reservation.reservation_id -? ReservationReview.reservation_id
+Ref: Reservation.reservation_id -? UserReview.reservation_id
 
+Ref: ResourceReview.reservation_id > Reservation.reservation_id
 Ref: ResourceReview.resource_id > Resource.resource_id
 Ref: ResourceReview.reviewer_user_id > User.user_id
 

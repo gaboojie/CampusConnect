@@ -445,7 +445,7 @@ export async function deleteAccount(
     await client.query(`DELETE FROM "EmailVerificationToken" WHERE user_id = $1`, [userId]);
     await client.query(`DELETE FROM "Session" WHERE user_id = $1`, [userId]);
     await client.query(`DELETE FROM "Notification" WHERE user_id = $1`, [userId]);
-    await client.query(`DELETE FROM "ReservationReview" WHERE reviewer_user_id = $1 OR reviewee_user_id = $1`, [userId]);
+    await client.query(`DELETE FROM "UserReview" WHERE reviewer_user_id = $1 OR reviewee_user_id = $1`, [userId]);
     await client.query(`DELETE FROM "ResourceReview" WHERE reviewer_user_id = $1`, [userId]);
     if (row.profile_image_id !== null) {
       await client.query(`DELETE FROM "ImageMetadata" WHERE image_id = $1`, [row.profile_image_id]);

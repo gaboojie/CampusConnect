@@ -46,6 +46,10 @@ export type Reservation = {
   creditsCharged: number | null;
   // Cancelling now would return creditsCharged.
   refundEligible: boolean;
+  // Set when a finished, non-cancelled reservation has not been reviewed yet.
+  canReviewResource?: boolean;
+  // Set after this reservation has received its resource review.
+  resourceReviewSubmitted?: boolean;
 };
 
 // Credit movement caused by one reservation request.
@@ -91,6 +95,8 @@ type ReservationRow = {
   is_upcoming: boolean;
   refund_window_open: boolean;
   credits_charged: number | null;
+  can_review_resource?: boolean;
+  resource_review_submitted?: boolean;
 };
 
 type CheckRow = {
@@ -170,10 +176,18 @@ function reservationSelectSql(source: string): string {
       (rv.status = 'confirmed' AND rv.start_time > ${CAMPUS_NOW_SQL}) AS can_modify,
       (rv.end_time > ${CAMPUS_NOW_SQL}) AS is_upcoming,
       (rv.start_time - ${CAMPUS_NOW_SQL} >= ${REFUND_WINDOW_SQL}) AS refund_window_open,
-      ${PAIRED_CHARGE_CREDITS_SQL} AS credits_charged
+      ${PAIRED_CHARGE_CREDITS_SQL} AS credits_charged,
+      (
+        rv.status IN ('confirmed', 'completed')
+        AND rv.end_time <= ${CAMPUS_NOW_SQL}
+        AND resource_review.review_id IS NULL
+      ) AS can_review_resource,
+      (resource_review.review_id IS NOT NULL) AS resource_review_submitted
     FROM ${source} AS rv
     JOIN "Resource" AS r ON r.resource_id = rv.resource_id
     JOIN "Building" AS b ON b.building_id = r.building_id
+    LEFT JOIN "ResourceReview" AS resource_review
+      ON resource_review.reservation_id = rv.reservation_id
     ${pairedChargeJoinSql("rv")}
   `;
 }
@@ -195,12 +209,12 @@ export const LOCK_USER_SQL = `
     u.credit_balance,
     (
       SELECT ROUND(AVG(rr.rating)::numeric, 2)::float8
-      FROM "ReservationReview" AS rr
+      FROM "UserReview" AS rr
       WHERE rr.reviewee_user_id = u.user_id
     ) AS user_review_score,
     (
       SELECT COUNT(*)::integer
-      FROM "ReservationReview" AS rr
+      FROM "UserReview" AS rr
       WHERE rr.reviewee_user_id = u.user_id
     ) AS user_review_count
   FROM "User" AS u
@@ -275,6 +289,11 @@ function slotProblem(check: CheckRow): ServiceResult<never> | null {
 
 function toReservation(row: ReservationRow): Reservation {
   const creditsCharged = row.credits_charged ?? null;
+  const reviewState = row.can_review_resource === true
+    ? { canReviewResource: true }
+    : row.resource_review_submitted === true
+      ? { resourceReviewSubmitted: true }
+      : {};
   return {
     id: row.reservation_id,
     resource: { id: row.resource_id, name: row.resource_name },
@@ -286,6 +305,7 @@ function toReservation(row: ReservationRow): Reservation {
     canModify: row.can_modify,
     creditsCharged,
     refundEligible: row.can_modify && Boolean(row.refund_window_open) && creditsCharged !== null,
+    ...reviewState,
   };
 }
 

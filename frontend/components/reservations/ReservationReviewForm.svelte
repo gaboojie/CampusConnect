@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { OwnerReservationReview } from '../../lib/types'
+  import type { OwnerUserReview } from '../../lib/types'
 
-  export let reservation: OwnerReservationReview
+  export let reservation: OwnerUserReview
   export let onSubmit: (input: { reservationId: number; rating: number; reason: string | null; isAnonymous: boolean }) => Promise<void>
   export let onClose: () => void
 

@@ -11,6 +11,7 @@
     SlotInput,
   } from '../../lib/types'
   import ReservationForm from '../reservations/ReservationForm.svelte'
+  import ResourceReviewForm from '../reservations/ResourceReviewForm.svelte'
 
   export let user: PublicUser
   export let onUserUpdated: (user: PublicUser) => void
@@ -25,6 +26,7 @@
 
   let editing: Reservation | null = null
   let cancelling: Reservation | null = null
+  let reviewing: Reservation | null = null
   let cancelSubmitting = false
   let cancelError = ''
   let message = ''
@@ -99,7 +101,8 @@
   function statusLabel(reservation: Reservation, inUpcoming: boolean): { text: string; tone: string } {
     switch (reservation.status) {
       case 'confirmed':
-        return inUpcoming && !reservation.canModify
+        if (!inUpcoming) return { text: 'Completed', tone: 'completed' }
+        return !reservation.canModify
           ? { text: 'In progress', tone: 'active' }
           : { text: 'Confirmed', tone: 'confirmed' }
       case 'cancelled':
@@ -130,6 +133,29 @@
   function openCancel(reservation: Reservation) {
     cancelling = reservation
     cancelError = ''
+  }
+
+  function openResourceReview(reservation: Reservation) {
+    message = ''
+    reviewing = reservation
+  }
+
+  async function submitResourceReview(input: { rating: number; reason: string | null; isAnonymous: boolean }) {
+    if (!reviewing) return
+    const reviewedReservation = reviewing
+    await sendJson('POST', `/api/reservations/${reviewedReservation.id}/resource-review`, input)
+    if (reservations) {
+      reservations = {
+        ...reservations,
+        past: reservations.past.map((reservation) =>
+          reservation.id === reviewedReservation.id
+            ? { ...reservation, canReviewResource: false, resourceReviewSubmitted: true }
+            : reservation,
+        ),
+      }
+    }
+    reviewing = null
+    message = `Thanks for reviewing ${reviewedReservation.resource.name}.`
   }
 
   function closeCancel() {
@@ -235,14 +261,23 @@
             {/if}
           </div>
 
-          {#if reservation.canModify}
+          {#if reservation.canModify || reservation.canReviewResource || reservation.resourceReviewSubmitted}
             <div class="reservation-card-actions">
+              {#if reservation.canReviewResource}
+                <button type="button" class="secondary-button" on:click={() => openResourceReview(reservation)}>
+                  Resource review
+                </button>
+              {:else if reservation.resourceReviewSubmitted}
+                <span class="review-complete-label">Resource reviewed</span>
+              {/if}
+              {#if reservation.canModify}
               <button type="button" class="secondary-button" on:click={() => { message = ''; editing = reservation }}>
                 Change time
               </button>
               <button type="button" class="danger-button" on:click={() => { message = ''; openCancel(reservation) }}>
                 Cancel
               </button>
+              {/if}
             </div>
           {/if}
         </li>
@@ -263,6 +298,10 @@
     onSubmit={reschedule}
     onClose={() => (editing = null)}
   />
+{/if}
+
+{#if reviewing}
+  <ResourceReviewForm reservation={reviewing} onSubmit={submitResourceReview} onClose={() => reviewing = null} />
 {/if}
 
 {#if cancelling}

@@ -126,7 +126,8 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
 - `001_schema.sql` creates the complete schema and `002_seed.sql` inserts the synthetic grading/demo data.
 - `003_notification_read.sql` adds `"Notification".read_at`, which tracks read state for the in-app notifications dropdown.
 - `004_login_lockout.sql` adds `"User".failed_login_attempts` and `"User".locked_until`, which power the five-attempt sign-in lockout.
-- `003` and `004` are additive and safe to re-run. An existing database picks them up by running the migrate command, with no reset needed. Run them on Neon `dev` first, then on `main` after review.
+- `005_review_schema_backfill.sql` renames `ReservationReview` to `UserReview`, adds the required `ResourceReview.reservation_id` relationship, and backfills existing resource reviews.
+- `003`, `004`, and `005` are additive and safe to re-run. An existing database picks them up by running the migrate command, with no reset needed. Run them on Neon `dev` first, then on `main` after review.
 - `db/scripts/migrate.ts` applies files in order and records applied versions in `schema_migrations`, so already-applied files are skipped.
 - `npm run migrate:dev` and `npm run migrate:prod` automatically use `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` from `.env.dev` or `.env.prod`, respectively. For example:
 
@@ -205,7 +206,7 @@ docs/                        Architecture notes, diagrams, and report materials
 db/                          Database boundary
 db/client.ts                 PostgreSQL client wrapper
 db/repositories/             All SQL-backed queries (admin, auth, calendar, inbox, notifications, resources, ...)
-db/migrations/               Ordered SQL: schema, seed data, notification read state, login lockout
+db/migrations/               Ordered SQL: schema, seed data, notification read state, login lockout, review backfill
 db/scripts/                  migrate.ts, reset-database.ts, and admin-command.ts
 db/reference/                Seed images and data-source notes
 backend/                     Server-side code

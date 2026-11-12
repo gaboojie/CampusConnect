@@ -584,10 +584,10 @@ FROM (VALUES
 ) AS seed(notification_id, user_id, message, notification_type, created_at);
 
 -- -----------------------------------------------------------------------------
--- ReservationReview: the reserving student reviews the resource owner.
+-- UserReview: the reserving student reviews the resource owner.
 -- Only completed reservations are reviewed; created after the reservation ends.
 -- -----------------------------------------------------------------------------
-INSERT INTO "ReservationReview" (reservation_id, reviewer_user_id, reviewee_user_id, rating, reason, created_at, is_anonymous_review) VALUES
+INSERT INTO "UserReview" (reservation_id, reviewer_user_id, reviewee_user_id, rating, reason, created_at, is_anonymous_review) VALUES
     (1, 6, 2, 5, 'Room was unlocked and ready on time. Booking was easy.', '2026-09-03 21:18:00', FALSE),
     (4, 8, 2, 5, 'Everything matched the listing.', '2026-08-27 19:00:00', FALSE),
     (6, 8, 3, 4, 'Court was set up when we arrived, but the net was not.', '2026-09-10 22:36:00', FALSE),
@@ -606,55 +606,55 @@ INSERT INTO "ReservationReview" (reservation_id, reviewer_user_id, reviewee_user
 -- -----------------------------------------------------------------------------
 -- ResourceReview: written by users who completed a reservation of that resource.
 -- -----------------------------------------------------------------------------
-INSERT INTO "ResourceReview" (review_id, resource_id, reviewer_user_id, rating, reason, created_at, is_anonymous_review) VALUES
+INSERT INTO "ResourceReview" (review_id, reservation_id, resource_id, reviewer_user_id, rating, reason, created_at, is_anonymous_review) VALUES
     -- reservation 1
-    (1, 4, 6, 5, 'Quiet room with plenty of space. Great for our group study session.', '2026-09-03 21:12:00', FALSE),
+    (1, 1, 4, 6, 5, 'Quiet room with plenty of space. Great for our group study session.', '2026-09-03 21:12:00', FALSE),
     -- reservation 4
-    (2, 2, 8, 4, 'Good room for two people working on a lab report. Whiteboard markers were running low.', '2026-08-27 19:00:00', FALSE),
+    (2, 4, 2, 8, 4, 'Good room for two people working on a lab report. Whiteboard markers were running low.', '2026-08-27 19:00:00', FALSE),
     -- reservation 5
-    (3, 9, 8, 4, 'Nice spot to study between classes. Gets a little noisy around noon.', '2026-09-04 14:00:00', FALSE),
+    (3, 5, 9, 8, 4, 'Nice spot to study between classes. Gets a little noisy around noon.', '2026-09-04 14:00:00', FALSE),
     -- reservation 6
-    (4, 10, 8, 5, 'Courts were in great shape and we had plenty of room for a full game.', '2026-09-10 22:30:00', FALSE),
+    (4, 6, 10, 8, 5, 'Courts were in great shape and we had plenty of room for a full game.', '2026-09-10 22:30:00', FALSE),
     -- reservation 7
-    (5, 14, 8, 4, 'Court was clean and the booking was easy. Lighting is a bit dim at the back.', '2026-09-25 14:00:00', FALSE),
+    (5, 7, 14, 8, 4, 'Court was clean and the booking was easy. Lighting is a bit dim at the back.', '2026-09-25 14:00:00', FALSE),
     -- reservation 8
-    (6, 20, 8, 5, 'Peaceful studio for an early morning session. Mats were clean.', '2026-10-06 13:00:00', FALSE),
+    (6, 8, 20, 8, 5, 'Peaceful studio for an early morning session. Mats were clean.', '2026-10-06 13:00:00', FALSE),
     -- reservation 11
-    (7, 12, 9, 5, 'Having a lane to myself before class was great.', '2026-09-18 10:00:00', FALSE),
+    (7, 11, 12, 9, 5, 'Having a lane to myself before class was great.', '2026-09-18 10:00:00', FALSE),
     -- reservation 12
-    (8, 16, 9, 4, 'Good court, though it was warm inside.', '2026-09-25 10:00:00', TRUE),
+    (8, 12, 16, 9, 4, 'Good court, though it was warm inside.', '2026-09-25 10:00:00', TRUE),
     -- reservation 14
-    (9, 1, 10, 5, 'Our go-to room for exam prep. The whiteboard is huge.', '2026-08-31 22:00:00', FALSE),
+    (9, 14, 1, 10, 5, 'Our go-to room for exam prep. The whiteboard is huge.', '2026-08-31 22:00:00', FALSE),
     -- reservation 15
-    (10, 1, 10, 4, 'Still a good room, but someone left trash from the earlier session.', '2026-09-16 23:00:00', FALSE),
+    (10, 15, 1, 10, 4, 'Still a good room, but someone left trash from the earlier session.', '2026-09-16 23:00:00', FALSE),
     -- reservation 17
-    (11, 10, 11, 5, 'Great for our pickup group of ten.', '2026-08-29 23:00:00', FALSE),
+    (11, 17, 10, 11, 5, 'Great for our pickup group of ten.', '2026-08-29 23:00:00', FALSE),
     -- reservation 18
-    (12, 10, 11, 4, 'Solid court. The volleyball net took a few minutes to set up.', '2026-09-13 14:00:00', FALSE),
+    (12, 18, 10, 11, 4, 'Solid court. The volleyball net took a few minutes to set up.', '2026-09-13 14:00:00', FALSE),
     -- reservation 21
-    (13, 22, 12, 5, 'Projector worked right away and the room fit our whole club.', '2026-09-09 22:30:00', FALSE),
+    (13, 21, 22, 12, 5, 'Projector worked right away and the room fit our whole club.', '2026-09-09 22:30:00', FALSE),
     -- reservation 24
-    (14, 7, 13, 4, 'Comfortable for a team meeting. Wi-Fi was a little slow.', '2026-09-08 23:00:00', FALSE),
+    (14, 24, 7, 13, 4, 'Comfortable for a team meeting. Wi-Fi was a little slow.', '2026-09-08 23:00:00', FALSE),
     -- reservation 27
-    (15, 20, 14, 5, 'Good size and nice and quiet for a morning flow.', '2026-09-06 12:30:00', FALSE),
+    (15, 27, 20, 14, 5, 'Good size and nice and quiet for a morning flow.', '2026-09-06 12:30:00', FALSE),
     -- reservation 28
-    (16, 13, 14, 3, 'Studio was fine but the sound system was not working.', '2026-09-20 16:30:00', TRUE),
+    (16, 28, 13, 14, 3, 'Studio was fine but the sound system was not working.', '2026-09-20 16:30:00', TRUE),
     -- reservation 30
-    (17, 14, 15, 4, 'Court was ready on time. Floor is a bit slippery near the door.', '2026-09-03 20:00:00', FALSE),
+    (17, 30, 14, 15, 4, 'Court was ready on time. Floor is a bit slippery near the door.', '2026-09-03 20:00:00', FALSE),
     -- reservation 33
-    (18, 6, 16, 5, 'Two large whiteboards made planning our project so much easier.', '2026-09-14 16:30:00', FALSE),
+    (18, 33, 6, 16, 5, 'Two large whiteboards made planning our project so much easier.', '2026-09-14 16:30:00', FALSE),
     -- reservation 36
-    (19, 17, 17, 4, 'Fun court for doubles. Wish the nets were a little taller.', '2026-09-13 15:30:00', FALSE),
+    (19, 36, 17, 17, 4, 'Fun court for doubles. Wish the nets were a little taller.', '2026-09-13 15:30:00', FALSE),
     -- reservation 39
-    (20, 12, 18, 5, 'Lane was always open when I arrived. Very easy to use.', '2026-09-08 09:00:00', FALSE),
+    (20, 39, 12, 18, 5, 'Lane was always open when I arrived. Very easy to use.', '2026-09-08 09:00:00', FALSE),
     -- reservation 43
-    (21, 16, 19, 4, 'Good court for a quick match after class.', '2026-09-10 21:00:00', FALSE),
+    (21, 43, 16, 19, 4, 'Good court for a quick match after class.', '2026-09-10 21:00:00', FALSE),
     -- reservation 45
-    (22, 3, 20, 5, 'The display made it easy for our group to review slides together.', '2026-09-17 15:00:00', FALSE),
+    (22, 45, 3, 20, 5, 'The display made it easy for our group to review slides together.', '2026-09-17 15:00:00', FALSE),
     -- reservation 50
-    (23, 8, 22, 5, 'Plenty of room for our whole design team.', '2026-09-23 23:00:00', FALSE),
+    (23, 50, 8, 22, 5, 'Plenty of room for our whole design team.', '2026-09-23 23:00:00', FALSE),
     -- reservation 55
-    (24, 18, 24, 4, 'Quick, easy game during lunch. Paddles were a little worn.', '2026-10-09 14:00:00', FALSE);
+    (24, 55, 18, 24, 4, 'Quick, easy game during lunch. Paddles were a little worn.', '2026-10-09 14:00:00', FALSE);
 
 -- -----------------------------------------------------------------------------
 -- Session (synthetic SHA-256 token hashes; sessions last 7 days)
@@ -694,7 +694,7 @@ INSERT INTO "Session" (session_id, user_id, token_hash, created_at, expires_at) 
 
 -- -----------------------------------------------------------------------------
 -- Advance identity sequences past the explicit IDs used above.
--- (reservationreview has no identity column: its PK is reservation_id.)
+-- (userreview has no identity column: its PK is reservation_id.)
 -- -----------------------------------------------------------------------------
 DO $$
 BEGIN

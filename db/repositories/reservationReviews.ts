@@ -5,7 +5,7 @@ const REVIEW_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 100;
 const MAX_REASON_LENGTH = 500;
 
-export type ReservationReviewInput = {
+export type UserReviewInput = {
   reservationId: number;
   rating: number;
   reason: string | null;
@@ -16,7 +16,7 @@ export type ReviewServiceResult<T> =
   | { ok: true; value: T }
   | { ok: false; status: 400 | 404 | 409; error: string };
 
-export type OwnerReservationReview = {
+export type OwnerUserReview = {
   reservationId: number;
   reserver: { id: number; username: string };
   startTime: string;
@@ -62,7 +62,7 @@ function textValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-export function parseReservationReviewInput(body: unknown): Validation<ReservationReviewInput> {
+export function parseUserReviewInput(body: unknown): Validation<UserReviewInput> {
   if (!body || typeof body !== "object") {
     return { ok: false, error: "Review details are required." };
   }
@@ -128,7 +128,7 @@ function toOwnerReview(row: {
   review_reason: string | null;
   review_created_at: string | null;
   review_is_anonymous: boolean | null;
-}): OwnerReservationReview {
+}): OwnerUserReview {
   return {
     reservationId: row.reservation_id,
     reserver: { id: row.reserver_id, username: row.reserver_username },
@@ -145,11 +145,11 @@ function toOwnerReview(row: {
   };
 }
 
-export async function listOwnerReservationReviews(
+export async function listOwnerUserReviews(
   client: DatabaseClient,
   resourceId: number,
   ownerId: number,
-): Promise<ReviewServiceResult<OwnerReservationReview[]>> {
+): Promise<ReviewServiceResult<OwnerUserReview[]>> {
   const ownership = await client.query<{ resource_id: number }>(
     `SELECT resource_id FROM "Resource" WHERE resource_id = $1 AND owner_id = $2`,
     [resourceId, ownerId],
@@ -180,7 +180,7 @@ export async function listOwnerReservationReviews(
         rr.is_anonymous_review AS review_is_anonymous
       FROM "Reservation" AS r
       JOIN "User" AS reserver ON reserver.user_id = r.user_id
-      LEFT JOIN "ReservationReview" AS rr ON rr.reservation_id = r.reservation_id
+      LEFT JOIN "UserReview" AS rr ON rr.reservation_id = r.reservation_id
       WHERE r.resource_id = $1
         AND r.status = 'completed'
         AND r.user_id <> $2
@@ -198,12 +198,12 @@ function isUniqueViolation(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "23505";
 }
 
-export async function createReservationReview(
+export async function createUserReview(
   client: DatabaseClient,
   resourceId: number,
   ownerId: number,
-  input: ReservationReviewInput,
-): Promise<ReviewServiceResult<OwnerReservationReview>> {
+  input: UserReviewInput,
+): Promise<ReviewServiceResult<OwnerUserReview>> {
   const reservation = await client.query<{
     reservation_id: number;
     reserver_id: number;
@@ -223,7 +223,7 @@ export async function createReservationReview(
         to_char(r.start_time, 'YYYY-MM-DD"T"HH24:MI:SS') AS start_time,
         to_char(r.end_time, 'YYYY-MM-DD"T"HH24:MI:SS') AS end_time,
         (r.end_time > ${CAMPUS_NOW_SQL} - interval '7 days' AND r.end_time <= ${CAMPUS_NOW_SQL}) AS is_in_window,
-        EXISTS (SELECT 1 FROM "ReservationReview" AS existing WHERE existing.reservation_id = r.reservation_id) AS existing_review
+        EXISTS (SELECT 1 FROM "UserReview" AS existing WHERE existing.reservation_id = r.reservation_id) AS existing_review
       FROM "Resource" AS resource
       JOIN "Reservation" AS r ON r.resource_id = resource.resource_id
       JOIN "User" AS reserver ON reserver.user_id = r.user_id
@@ -250,7 +250,7 @@ export async function createReservationReview(
       is_anonymous_review: boolean;
     }>(
       `
-        INSERT INTO "ReservationReview" (
+        INSERT INTO "UserReview" (
           reservation_id, reviewer_user_id, reviewee_user_id, rating, reason, is_anonymous_review
         )
         VALUES ($1, $2, $3, $4, $5, $6)
@@ -280,7 +280,7 @@ export async function createReservationReview(
   }
 }
 
-export async function listUserReservationReviews(
+export async function listUserReviews(
   client: DatabaseClient,
   userId: number,
   query: ReviewPageQuery,
@@ -298,7 +298,7 @@ export async function listUserReservationReviews(
         COUNT(rr.reservation_id)::integer AS total,
         ROUND(AVG(rr.rating)::numeric, 2)::float8 AS average_rating
       FROM "User" AS u
-      LEFT JOIN "ReservationReview" AS rr ON rr.reviewee_user_id = u.user_id
+      LEFT JOIN "UserReview" AS rr ON rr.reviewee_user_id = u.user_id
       WHERE u.user_id = $1
       GROUP BY u.user_id, u.username
     `,
@@ -331,7 +331,7 @@ export async function listUserReservationReviews(
         CASE WHEN rr.is_anonymous_review THEN NULL ELSE reviewer.user_id END AS reviewer_id,
         CASE WHEN rr.is_anonymous_review THEN NULL ELSE reviewer.username END AS reviewer_username,
         COUNT(*) OVER()::integer AS total
-      FROM "ReservationReview" AS rr
+      FROM "UserReview" AS rr
       JOIN "Reservation" AS reservation ON reservation.reservation_id = rr.reservation_id
       JOIN "Resource" AS resource ON resource.resource_id = reservation.resource_id
       JOIN "User" AS reviewer ON reviewer.user_id = rr.reviewer_user_id

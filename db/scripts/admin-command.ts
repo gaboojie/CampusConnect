@@ -242,7 +242,7 @@ async function deleteUser(client: Client, username: string): Promise<{ user: Use
 
     await client.query(
       `
-        DELETE FROM "ReservationReview"
+        DELETE FROM "UserReview"
         WHERE reviewer_user_id = $1
            OR reviewee_user_id = $1
            OR reservation_id IN (

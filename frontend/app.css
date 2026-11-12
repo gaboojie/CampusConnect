@@ -2417,6 +2417,15 @@ a.resource-card:hover {
   gap: 0.5rem;
 }
 
+.review-complete-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  color: #4a5565;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .status-confirmed {
   color: #155b41;
   background: #e4f5ed;
@@ -3021,7 +3030,17 @@ a.resource-card:hover {
   width: min(520px, 100%);
 }
 
+.resource-review-modal {
+  width: min(520px, 100%);
+}
+
 .reservation-review-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.resource-review-form {
   display: grid;
   gap: 1rem;
   margin-top: 1.25rem;

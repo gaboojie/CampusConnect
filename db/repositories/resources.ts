@@ -660,7 +660,7 @@ export async function getResourceDetails(
         SELECT
           ROUND(AVG(rr.rating)::numeric, 2)::float8 AS average_rating,
           COUNT(*)::integer AS review_count
-        FROM "ReservationReview" AS rr
+        FROM "UserReview" AS rr
         WHERE rr.reviewee_user_id = $2
       ) AS viewer_rating ON TRUE
     `;

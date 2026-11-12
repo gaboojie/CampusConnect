@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createApp } from "../backend/index";
 import {
-  parseReservationReviewInput,
+  parseUserReviewInput,
   parseReviewPageQuery,
 } from "../db/repositories/reservationReviews";
 import { FakeReadDatabase, authHeaders } from "./support/fakeReadDatabase";
@@ -20,7 +20,7 @@ const ownerReservation = {
 
 describe("reservation review input", () => {
   it("accepts a rating, optional reason, and anonymity choice", () => {
-    expect(parseReservationReviewInput({
+    expect(parseUserReviewInput({
       reservationId: 41,
       rating: 5,
       reason: "Everything was ready.",
@@ -42,7 +42,7 @@ describe("reservation review input", () => {
     [{ reservationId: 41, rating: 4, isAnonymous: false, reason: "x".repeat(501) }, /500/],
     [{ reservationId: 41, rating: 4, isAnonymous: "yes" }, /anonymous/],
   ])("rejects invalid review input", (body, message) => {
-    const result = parseReservationReviewInput(body);
+    const result = parseUserReviewInput(body);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toMatch(message);
   });
@@ -130,7 +130,7 @@ describe("reservation review endpoints", () => {
         is_in_window: true,
         existing_review: false,
       }])
-      .respond("INSERT INTO \"ReservationReview\"", [{
+      .respond("INSERT INTO \"UserReview\"", [{
         rating: 4,
         reason: "Returned everything in good condition.",
         created_at: "2026-10-20T11:30:00",
@@ -168,7 +168,7 @@ describe("reservation review endpoints", () => {
         },
       },
     });
-    const insert = database.queries.find((query) => query.text.startsWith("INSERT INTO \"ReservationReview\""));
+    const insert = database.queries.find((query) => query.text.startsWith("INSERT INTO \"UserReview\""));
     expect(insert?.values).toEqual([41, 6, 12, 4, "Returned everything in good condition.", true]);
   });
 

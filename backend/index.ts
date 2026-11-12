@@ -63,12 +63,16 @@ import {
 } from "../db/repositories/maps";
 import { fetchPlacePhotos, type PlacePhoto } from "./places";
 import {
-  createReservationReview,
-  listOwnerReservationReviews,
-  listUserReservationReviews,
-  parseReservationReviewInput,
+  createUserReview,
+  listOwnerUserReviews,
+  listUserReviews,
+  parseUserReviewInput,
   parseReviewPageQuery,
 } from "../db/repositories/reservationReviews";
+import {
+  createResourceReview,
+  parseResourceReviewInput,
+} from "../db/repositories/resourceReviews";
 import { getDayCalendar, parseCalendarQuery } from "../db/repositories/calendar";
 import {
   listInbox,
@@ -889,7 +893,7 @@ export function createApp(options: AppOptions = {}) {
       const reviews = await withDatabase(
         c.env.DB.connectionString,
         createDatabaseClient,
-        (client) => listUserReservationReviews(client, userId, query.value),
+        (client) => listUserReviews(client, userId, query.value),
       );
       if (!reviews) return c.json({ error: "User not found." }, 404);
       return c.json(reviews);
@@ -1006,7 +1010,7 @@ export function createApp(options: AppOptions = {}) {
       const result = await withDatabase(
         c.env.DB.connectionString,
         createDatabaseClient,
-        (client) => listOwnerReservationReviews(client, resourceId, c.get("user").userId),
+        (client) => listOwnerUserReviews(client, resourceId, c.get("user").userId),
       );
       if (!result.ok) return c.json({ error: result.error }, result.status);
       return c.json({ reservations: result.value });
@@ -1019,7 +1023,7 @@ export function createApp(options: AppOptions = {}) {
     const resourceId = parsePositiveId(c.req.param("id"));
     if (resourceId === null) return c.json({ error: "Listing id must be a positive whole number." }, 400);
 
-    const input = parseReservationReviewInput(await readJson(c));
+    const input = parseUserReviewInput(await readJson(c));
     if (!input.ok) return c.json({ error: input.error }, 400);
     if (!c.env.DB) return databaseUnavailable(c);
 
@@ -1027,7 +1031,7 @@ export function createApp(options: AppOptions = {}) {
       const result = await withDatabase(
         c.env.DB.connectionString,
         createDatabaseClient,
-        (client) => createReservationReview(client, resourceId, c.get("user").userId, input.value),
+        (client) => createUserReview(client, resourceId, c.get("user").userId, input.value),
       );
       if (!result.ok) return c.json({ error: result.error }, result.status);
       return c.json({ reservation: result.value }, 201);
@@ -1209,6 +1213,29 @@ export function createApp(options: AppOptions = {}) {
       return c.json(reservations);
     } catch {
       return c.json({ error: "Unable to load your reservations right now." }, 503);
+    }
+  });
+
+  app.post("/api/reservations/:id/resource-review", async (c) => {
+    const reservationId = parsePositiveId(c.req.param("id"));
+    if (reservationId === null) {
+      return c.json({ error: "Reservation id must be a positive whole number." }, 400);
+    }
+
+    const input = parseResourceReviewInput(await readJson(c));
+    if (!input.ok) return c.json({ error: input.error }, 400);
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => createResourceReview(client, c.get("user").userId, reservationId, input.value),
+      );
+      if (!result.ok) return c.json({ error: result.error }, result.status);
+      return c.json({ review: result.value }, 201);
+    } catch {
+      return c.json({ error: "Unable to save this resource review right now." }, 503);
     }
   });
 

@@ -21,9 +21,10 @@ db/migrations/001_schema.sql
 db/migrations/002_seed.sql
 db/migrations/003_notification_read.sql
 db/migrations/004_login_lockout.sql
+db/migrations/005_review_schema_backfill.sql
 ```
 
-`003` and `004` are additive (`ADD COLUMN IF NOT EXISTS`), so an existing database is brought up to date with `npm run migrate:dev` or `npm run migrate:prod` and does not need a reset.
+`003`, `004`, and `005` are additive and safe to re-run, so an existing database is brought up to date with `npm run migrate:dev` or `npm run migrate:prod` and does not need a reset.
 
 Development and production use the same ordered migration files. The `--environment dev|prod` option selects the corresponding connection configuration and does not select a different SQL copy.
 

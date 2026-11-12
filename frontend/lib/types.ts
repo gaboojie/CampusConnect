@@ -139,7 +139,7 @@ export type ListingDetails = ResourceDetails & {
   maintenancePeriods?: ResourceMaintenancePeriod[]
 }
 
-export type OwnerReservationReview = {
+export type OwnerUserReview = {
   reservationId: number
   reserver: { id: number; username: string }
   startTime: string
@@ -192,6 +192,8 @@ export type Reservation = {
   creditsCharged: number | null
   // Cancelling now (at least 24 hours before the start) returns creditsCharged.
   refundEligible: boolean
+  canReviewResource?: boolean
+  resourceReviewSubmitted?: boolean
 }
 
 export type RefundStatus = 'refunded' | 'late' | 'not_charged' | 'unverified'
