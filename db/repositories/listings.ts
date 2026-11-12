@@ -850,7 +850,7 @@ export async function getOwnedResource(
 ): Promise<ListingResult<ListingDetails>> {
   const ownership = await ownedResource(client, resourceId, ownerId, false);
   if (!ownership.ok) return ownership;
-  const details = await getResourceDetails(client, resourceId);
+  const details = await getResourceDetails(client, resourceId, ownerId);
   if (!details) return fail(404, "Resource not found.");
   const availability = await getOwnedAvailability(client, resourceId);
   const maintenancePeriods = await getOwnedMaintenancePeriods(client, resourceId);

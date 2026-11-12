@@ -90,6 +90,7 @@ export type ResourceFeature = {
 
 export type ResourceDetails = {
   id: number
+  isOwner: boolean
   name: string
   description: string
   locationDescription: string

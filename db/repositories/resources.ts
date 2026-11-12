@@ -85,6 +85,7 @@ export type ResourceFilters = {
 
 export type ResourceDetails = {
   id: number;
+  isOwner: boolean;
   name: string;
   description: string;
   locationDescription: string;
@@ -555,6 +556,7 @@ export async function getResourceFilters(client: DatabaseClient): Promise<Resour
 
 type ResourceDetailRow = {
   resource_id: number;
+  is_owner: boolean;
   name: string;
   description: string;
   location_description: string;
@@ -685,6 +687,7 @@ export async function getResourceDetails(
         b.latitude AS building_latitude,
         b.longitude AS building_longitude,
         u.username AS owner_username,
+        ${viewerUserId === undefined ? "FALSE" : "r.owner_id = $2"} AS is_owner,
         img.image_id,
         img.alt_text AS image_alt_text,
         r.min_user_review_score,
@@ -789,6 +792,7 @@ export async function getResourceDetails(
 
   return {
     id: resource.resource_id,
+    isOwner: resource.is_owner === true,
     name: resource.name,
     description: resource.description,
     locationDescription: resource.location_description,

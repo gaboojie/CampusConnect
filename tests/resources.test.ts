@@ -23,6 +23,7 @@ const summaryRow = {
 
 const detailRow = {
   resource_id: 22,
+  is_owner: false,
   name: "Squires Meeting Room B",
   description: "Larger meeting room for organization general body meetings, with a projector.",
   location_description: "Squires Student Center",
@@ -307,10 +308,10 @@ describe("GET /api/resources/filters", () => {
 });
 
 describe("GET /api/resources/:id", () => {
-  function detailDatabase() {
+  function detailDatabase(row = detailRow) {
     return new FakeReadDatabase()
       .respond("SELECT r.resource_id, r.name, r.description, r.location_description", (values) =>
-        values[0] === 22 ? [detailRow] : [],
+        values[0] === 22 ? [row] : [],
       )
       .respond("SELECT feature_name, description", [
         { feature_name: "Microphone", description: "Wireless microphone." },
@@ -362,6 +363,7 @@ describe("GET /api/resources/:id", () => {
         { id: 6, startTime: "2026-10-20T09:00:00", endTime: "2026-10-20T21:00:00", reason: "Projector replacement." },
       ],
       images: [{ id: 6, altText: null, url: "/api/resource-images/6" }],
+      isOwner: false,
       recentReviews: [
         { id: 8, rating: 4, reason: "Warm inside.", createdAt: "2026-09-25T10:00:00", reviewerUsername: null },
       ],
@@ -369,6 +371,17 @@ describe("GET /api/resources/:id", () => {
     expect(database.queries[0].values).toEqual([22, 6]);
     expect(database.queries.slice(1).every((query) => query.values.length === 1 && query.values[0] === 22)).toBe(true);
     expectReadOnly(database.queries);
+  });
+
+  it("marks the current user as the owner when the resource belongs to them", async () => {
+    const database = detailDatabase({ ...detailRow, is_owner: true });
+    const { get } = setup(database);
+
+    const response = await get("/api/resources/22");
+
+    expect(response.status).toBe(200);
+    const { resource } = (await response.json()) as { resource: { isOwner: boolean } };
+    expect(resource.isOwner).toBe(true);
   });
 
   it("hides anonymous reviewers in SQL", async () => {

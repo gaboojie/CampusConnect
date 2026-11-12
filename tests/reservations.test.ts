@@ -33,6 +33,7 @@ type FakeCreditTransaction = {
 };
 
 type FakeResource = {
+  ownerId: number;
   name: string;
   maxMinutes: number | null;
   requiredCredits: number;
@@ -68,8 +69,9 @@ class FakeReservationDatabase {
   sessions = new Map<string, number>();
   bannedUsers = new Set<number>();
   resources = new Map<number, FakeResource>([
-    [1, { name: "Newman Group Study Room 1", maxMinutes: 120, requiredCredits: 2, minUserReviewScore: null, opensAt: "08:00", closesAt: "23:00" }],
-    [2, { name: "Squires Meeting Room B", maxMinutes: null, requiredCredits: 3, minUserReviewScore: null, opensAt: "08:00", closesAt: "23:00" }],
+    [1, { ownerId: 99, name: "Newman Group Study Room 1", maxMinutes: 120, requiredCredits: 2, minUserReviewScore: null, opensAt: "08:00", closesAt: "23:00" }],
+    [2, { ownerId: 99, name: "Squires Meeting Room B", maxMinutes: null, requiredCredits: 3, minUserReviewScore: null, opensAt: "08:00", closesAt: "23:00" }],
+    [3, { ownerId: 6, name: "Owner Studio", maxMinutes: 120, requiredCredits: 50, minUserReviewScore: 4.5, opensAt: "08:00", closesAt: "23:00" }],
   ]);
   reviewScores = new Map<number, { score: number | null; count: number }>();
   balances = new Map<number, number>([[6, 20], [7, 20]]);
@@ -261,7 +263,7 @@ class FakeReservationDatabase {
         if (this.locksEnabled) held.push(await this.acquire(`resource:${id}`));
         const resource = this.resources.get(id);
         return resource
-          ? [{ resource_id: id, required_credits: resource.requiredCredits, min_user_review_score: resource.minUserReviewScore }]
+          ? [{ resource_id: id, owner_id: resource.ownerId, required_credits: resource.requiredCredits, min_user_review_score: resource.minUserReviewScore }]
           : [];
       }
       if (query === LOCK_USER) {
@@ -481,6 +483,25 @@ describe("POST /api/reservations", () => {
     expect(queries).toHaveLength(10);
     expect(database.log[3].values).toEqual([1, "2026-10-20 10:00", "2026-10-20 11:00", MAYA]);
     expect(database.log[6].values).toEqual([MAYA, 2, 100]);
+  });
+
+  it("lets an owner reserve without credits or a minimum review score", async () => {
+    const { database, request } = await setup();
+    database.setReviewScore(MAYA, 1, 1);
+
+    const response = await request("POST", "/api/reservations", { resourceId: 3, ...slot });
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({
+      reservation: expect.objectContaining({
+        resource: { id: 3, name: "Owner Studio" },
+        creditsCharged: null,
+      }),
+    });
+    expect(database.balances.get(MAYA)).toBe(20);
+    expect(database.creditsOf(MAYA, "reservation_charge")).toEqual([]);
+    expect(database.queries()).not.toContain(STAMP_TAKEN);
+    expect(database.queries()).not.toContain(CHARGE);
   });
 
   it.each([

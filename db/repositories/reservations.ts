@@ -193,7 +193,7 @@ function reservationSelectSql(source: string): string {
 }
 
 export const LOCK_RESOURCE_SQL = `
-  SELECT resource_id, required_credits, min_user_review_score
+  SELECT resource_id, owner_id, required_credits, min_user_review_score
   FROM "Resource"
   WHERE resource_id = $1
   FOR UPDATE
@@ -339,6 +339,7 @@ async function inTransaction<T>(
 }
 
 type LockedResourceAndUser = {
+  isOwner: boolean;
   requiredCredits: number;
   creditBalance: number;
   minUserReviewScore: number | null;
@@ -355,6 +356,7 @@ async function lockResourceAndUser(
   options: { rejectBanned: boolean } = { rejectBanned: true },
 ): Promise<ServiceResult<LockedResourceAndUser>> {
   const resource = await client.query<{
+    owner_id: number;
     required_credits: number;
     min_user_review_score: number | string | null;
   }>(LOCK_RESOURCE_SQL, [resourceId]);
@@ -376,6 +378,7 @@ async function lockResourceAndUser(
   return {
     ok: true,
     value: {
+      isOwner: resource.rows[0].owner_id === userId,
       requiredCredits: resource.rows[0].required_credits,
       creditBalance: row.credit_balance,
       minUserReviewScore: resource.rows[0].min_user_review_score === null
@@ -441,18 +444,20 @@ export async function createReservation(
     const locked = await lockResourceAndUser(client, input.resourceId, userId);
     if (!locked.ok) return locked;
 
-    const reviewProblem = minimumReviewScoreFailure(
-      locked.value.minUserReviewScore,
-      locked.value.userReviewScore,
-      locked.value.userReviewCount,
-    );
-    if (reviewProblem) return reviewProblem;
+    if (!locked.value.isOwner) {
+      const reviewProblem = minimumReviewScoreFailure(
+        locked.value.minUserReviewScore,
+        locked.value.userReviewScore,
+        locked.value.userReviewCount,
+      );
+      if (reviewProblem) return reviewProblem;
+    }
 
     const problem = await checkSlot(client, input.resourceId, input.slot, userId);
     if (problem) return problem;
 
-    const { requiredCredits, creditBalance } = locked.value;
-    if (creditBalance < requiredCredits) {
+    const { isOwner, requiredCredits, creditBalance } = locked.value;
+    if (!isOwner && creditBalance < requiredCredits) {
       return fail(
         409,
         `This booking costs ${pluralCredits(requiredCredits)}, but you have ${pluralCredits(creditBalance)}.`,
@@ -462,7 +467,7 @@ export async function createReservation(
     // The charge is paired with the reservation by their shared created_at, so
     // that timestamp must be unused for this user. Only two of the user's
     // requests starting in the same microsecond can collide.
-    if (await pairingStampTaken(client, userId)) {
+    if (!isOwner && await pairingStampTaken(client, userId)) {
       return fail(409, "Another booking request was being processed at the same moment. Please try again.");
     }
 
@@ -479,22 +484,24 @@ export async function createReservation(
     );
     const reservationId = inserted.rows[0].reservation_id;
 
-    const balance = await chargeReservation(client, {
-      userId,
-      reservationId,
-      credits: requiredCredits,
-    });
+    const balance = isOwner
+      ? creditBalance
+      : await chargeReservation(client, {
+          userId,
+          reservationId,
+          credits: requiredCredits,
+        });
 
     const notificationId = await createReservationReminderNotification(client, reservationId);
 
     // The select above ran in the same statement as the INSERT, so it could not
     // see the charge yet.
-    const row = { ...inserted.rows[0], credits_charged: requiredCredits };
+    const row = { ...inserted.rows[0], credits_charged: isOwner ? null : requiredCredits };
     return {
       ok: true,
       value: toReservation(row),
       notificationIds: [notificationId],
-      credits: { charged: requiredCredits, refunded: 0, balance },
+      ...(isOwner ? {} : { credits: { charged: requiredCredits, refunded: 0, balance } }),
     };
   });
 }

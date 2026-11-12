@@ -10,7 +10,6 @@
   import AnnouncementsSection from './sections/AnnouncementsSection.svelte'
   import CreditsSection from './sections/CreditsSection.svelte'
   import ListingsSection from './sections/ListingsSection.svelte'
-  import ListingDetailSection from './sections/ListingDetailSection.svelte'
   import MapsSection from './sections/MapsSection.svelte'
   import PlaceholderSection from './sections/PlaceholderSection.svelte'
   import ProfileSection from './sections/ProfileSection.svelte'
@@ -161,6 +160,7 @@
       <ResourceDetailSection
         resourceId={location.subpath}
         backQuery={location.query}
+        origin="resources"
         {user}
         {onUserUpdated}
         onResourceWarningChange={(warning) => resourceReviewWarning = warning}
@@ -170,7 +170,7 @@
     {:else if route.id === 'maps'}
       <MapsSection />
     {:else if route.id === 'listings' && location.subpath}
-      <ListingDetailSection listingId={location.subpath} {user} />
+      <ResourceDetailSection resourceId={location.subpath} origin="listings" {user} onUserUpdated={onUserUpdated} onResourceWarningChange={(warning) => resourceReviewWarning = warning} />
     {:else if route.id === 'listings'}
       <ListingsSection {user} />
     {:else if route.id === 'reservations'}

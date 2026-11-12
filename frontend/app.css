@@ -1746,9 +1746,14 @@ code {
 
 .detail-actions {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 0.6rem;
   margin-top: 1rem;
+}
+
+.reserve-box .detail-actions {
+  margin-top: 0;
 }
 
 @media (max-width: 600px) {
@@ -2401,6 +2406,10 @@ a.resource-card:hover {
 
 .review-task-section + .review-task-section {
   margin-top: 2rem;
+}
+
+.review-task-section .empty-state {
+  margin-top: 1.5rem;
 }
 
 .review-task-list {

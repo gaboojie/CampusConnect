@@ -74,7 +74,7 @@
     void load()
   }
 
-  async function load() {
+  async function load(filter: AnnouncementType | '' = announcementType) {
     controller?.abort()
     const request = new AbortController()
     controller = request
@@ -82,7 +82,7 @@
     error = ''
 
     try {
-      const params = announcementType ? `?type=${announcementType}` : ''
+      const params = filter ? `?type=${filter}` : ''
       const payload = await getJson<{ announcements: Announcement[] }>(`/api/announcements${params}`, request.signal)
       announcements = payload.announcements
     } catch (caught) {
@@ -105,7 +105,7 @@
       return
     }
     if (requestedReviews) window.location.hash = '#/announcements'
-    void load()
+    void load(value)
   }
 
   async function loadReviews() {
@@ -198,7 +198,7 @@
     {:else if error}
       <div class="notice error-notice state-notice" role="alert">
         <p>{error}</p>
-        <button type="button" class="secondary-button" on:click={load}>Try again</button>
+        <button type="button" class="secondary-button" on:click={() => load()}>Try again</button>
       </div>
     {:else if announcements.length === 0}
       <div class="panel empty-state">
@@ -240,7 +240,6 @@
         <div class="section-heading-row">
           <div>
             <h3 id="review-tasks-title">Reviews</h3>
-            <p class="muted">Rate resources you used and students who recently used your resources.</p>
           </div>
         </div>
         {#if mixedReviewTasks.length === 0}
