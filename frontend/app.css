@@ -1722,6 +1722,18 @@ h3 {
   background: #e4f5ed;
 }
 
+.resource-card-badges {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.maintenance-badge {
+  color: #7a4b00;
+  background: #fff1cc;
+}
+
 .star {
   color: #c26a00;
 }
@@ -2067,6 +2079,25 @@ a.resource-card:hover {
 
 .detail-block-wide {
   grid-column: 1 / -1;
+}
+
+.feature-detail-block {
+  grid-column: 1 / -1;
+}
+
+.feature-detail-block .feature-details {
+  gap: 1rem;
+}
+
+.feature-detail-block .feature-details li {
+  gap: 0.2rem;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.feature-detail-block .feature-details strong {
+  color: #172033;
+  font-size: 1.1rem;
 }
 
 .detail-facts {

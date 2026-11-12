@@ -171,6 +171,7 @@ describe("resource search SQL", () => {
     expect(text).toContain("rv.status <> 'cancelled'");
     expect(text).toContain("rv.start_time < $3::timestamp AND rv.end_time > $2::timestamp");
     expect(text).toContain("mp.start_time < $3::timestamp AND mp.end_time > $2::timestamp");
+    expect(text).toContain("mp.start_time <= (now() AT TIME ZONE 'America/New_York')");
   });
 
   it.each([
@@ -224,6 +225,7 @@ describe("GET /api/resources", () => {
       limit: 1,
       offset: 3,
     });
+
     expect(database.queries).toHaveLength(2);
     expect(database.queries[1].values).toEqual([1, 1, 3]);
     expectReadOnly(database.queries);
@@ -241,6 +243,22 @@ describe("GET /api/resources", () => {
     expect(database.queries[0].values).toEqual([5]);
     expect(database.queries[1].values).toEqual([5, 50, 0]);
     expectReadOnly(database.queries);
+  });
+
+  it("marks resources that are currently under maintenance", async () => {
+    const database = new FakeReadDatabase()
+      .respond("SELECT COUNT(*)", [{ total: 1 }])
+      .respond("SELECT r.resource_id, r.name, r.description, r.capacity", [{
+        ...summaryRow,
+        is_under_maintenance: true,
+      }]);
+    const { get } = setup(database);
+
+    const response = await get("/api/resources");
+
+    expect(response.status).toBe(200);
+    const payload = await response.json() as { resources: Array<{ isUnderMaintenance?: boolean }> };
+    expect(payload.resources[0].isUnderMaintenance).toBe(true);
   });
 
   it("rejects invalid filters before touching the database", async () => {

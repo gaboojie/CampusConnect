@@ -24,6 +24,17 @@ const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 type AvailabilityInput = Omit<AvailabilitySlot, "id">;
 
+export type MaintenancePeriodInput = {
+  startTime: string;
+  endTime: string;
+  reason: string;
+};
+
+export type ResourceFeatureInput = {
+  name: string;
+  description: string;
+};
+
 export type ListingInput = {
   name: string;
   description: string;
@@ -35,6 +46,8 @@ export type ListingInput = {
   capacity: number;
   maxReservationMinutes: number | null;
   availability: AvailabilityInput[] | null;
+  maintenancePeriods: MaintenancePeriodInput[] | null;
+  features: ResourceFeatureInput[] | null;
   image: File | null;
   removeImage: boolean;
 };
@@ -48,6 +61,7 @@ export type ListingDetails = ResourceDetails & {
   hasActiveReservation: boolean;
   activeReservation: { startTime: string; endTime: string } | null;
   availability: AvailabilitySlot[];
+  maintenancePeriods: Array<MaintenancePeriodInput & { id: number }>;
 };
 
 export type ListingResult<T> =
@@ -181,6 +195,101 @@ function parseAvailability(value: unknown): Validation<AvailabilityInput[] | nul
   return { ok: true, value: slots };
 }
 
+function parseMaintenancePeriods(value: unknown): Validation<MaintenancePeriodInput[] | null> {
+  if (value === undefined || value === null || value === "") {
+    return { ok: true, value: null };
+  }
+  if (typeof value !== "string") {
+    return { ok: false, error: "Maintenance periods must be a JSON array." };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return { ok: false, error: "Maintenance periods must be a valid JSON array." };
+  }
+  if (!Array.isArray(parsed)) {
+    return { ok: false, error: "Maintenance periods must be a JSON array." };
+  }
+  if (parsed.length > 20) {
+    return { ok: false, error: "Add at most 20 maintenance periods." };
+  }
+
+  const periods: MaintenancePeriodInput[] = [];
+  for (const entry of parsed) {
+    if (!entry || typeof entry !== "object") {
+      return { ok: false, error: "Each maintenance period must be an object." };
+    }
+
+    const row = entry as Record<string, unknown>;
+    const startTime = parseLocalDateTime(row.startTime);
+    const endTime = parseLocalDateTime(row.endTime);
+    const reason = typeof row.reason === "string" ? row.reason.trim() : "";
+    if (!startTime || !endTime) {
+      return { ok: false, error: "Maintenance times must use a valid local date and time." };
+    }
+    if (localDateTimeMs(endTime) <= localDateTimeMs(startTime)) {
+      return { ok: false, error: "Maintenance end time must be after its start time." };
+    }
+    if (reason.length < 3 || reason.length > 500) {
+      return { ok: false, error: "Maintenance reason must be between 3 and 500 characters." };
+    }
+    periods.push({ startTime, endTime, reason });
+  }
+
+  periods.sort((left, right) => localDateTimeMs(left.startTime) - localDateTimeMs(right.startTime));
+  for (let index = 1; index < periods.length; index += 1) {
+    if (localDateTimeMs(periods[index].startTime) < localDateTimeMs(periods[index - 1].endTime)) {
+      return { ok: false, error: "Maintenance periods cannot overlap." };
+    }
+  }
+
+  return { ok: true, value: periods };
+}
+
+function parseResourceFeatures(value: unknown): Validation<ResourceFeatureInput[] | null> {
+  if (value === undefined || value === null || value === "") {
+    return { ok: true, value: null };
+  }
+  if (typeof value !== "string") {
+    return { ok: false, error: "Resource features must be a JSON array." };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return { ok: false, error: "Resource features must be a valid JSON array." };
+  }
+  if (!Array.isArray(parsed)) {
+    return { ok: false, error: "Resource features must be a JSON array." };
+  }
+  if (parsed.length > 30) {
+    return { ok: false, error: "Add at most 30 resource features." };
+  }
+
+  const features: ResourceFeatureInput[] = [];
+  for (const entry of parsed) {
+    if (!entry || typeof entry !== "object") {
+      return { ok: false, error: "Each resource feature must be an object." };
+    }
+
+    const row = entry as Record<string, unknown>;
+    const name = typeof row.name === "string" ? row.name.trim() : "";
+    const description = typeof row.description === "string" ? row.description.trim() : "";
+    if (name.length < 2 || name.length > 100) {
+      return { ok: false, error: "Feature names must be between 2 and 100 characters." };
+    }
+    if (description.length < 2 || description.length > 500) {
+      return { ok: false, error: "Feature descriptions must be between 2 and 500 characters." };
+    }
+    features.push({ name, description });
+  }
+
+  return { ok: true, value: features };
+}
+
 export function parseListingInput(body: Record<string, unknown>): Validation<ListingInput> {
   const name = text(body, "name");
   const description = text(body, "description");
@@ -193,10 +302,15 @@ export function parseListingInput(body: Record<string, unknown>): Validation<Lis
   const hours = optionalInteger(body, "maxReservationHours");
   const minutes = optionalInteger(body, "maxReservationMinutes");
   const availability = parseAvailability(body.availability);
+  const maintenancePeriods = parseMaintenancePeriods(body.maintenancePeriods);
+  const features = parseResourceFeatures(body.features);
+
   const image = parseImage(body.image);
   const errors: string[] = [];
 
   if (!availability.ok) errors.push(availability.error);
+  if (!maintenancePeriods.ok) errors.push(maintenancePeriods.error);
+  if (!features.ok) errors.push(features.error);
 
   if (name.length < 3) errors.push("Name must be at least 3 characters.");
   if (description.length < 3) errors.push("Description must be at least 3 characters.");
@@ -247,6 +361,8 @@ export function parseListingInput(body: Record<string, unknown>): Validation<Lis
       maxReservationMinutes:
         hours === null && minutes === null ? null : (hours ?? 0) * 60 + (minutes ?? 0),
       availability: availability.ok ? availability.value : null,
+      maintenancePeriods: maintenancePeriods.ok ? maintenancePeriods.value : null,
+      features: features.ok ? features.value : null,
       image: image!,
       removeImage: text(body, "removeImage") === "true",
     },
@@ -626,6 +742,107 @@ export async function listOwnedResources(client: DatabaseClient, ownerId: number
   }));
 }
 
+async function getOwnedMaintenancePeriods(
+  client: DatabaseClient,
+  resourceId: number,
+): Promise<Array<MaintenancePeriodInput & { id: number }>> {
+  const result = await client.query<{
+    maintenance_id: number;
+    start_time: string;
+    end_time: string;
+    reason: string;
+  }>(
+    `
+      SELECT
+        maintenance_id,
+        ${localTimestampSql("start_time")} AS start_time,
+        ${localTimestampSql("end_time")} AS end_time,
+        reason
+      FROM "MaintenancePeriod"
+      WHERE resource_id = $1
+        AND end_time > ${CAMPUS_NOW_SQL}
+      ORDER BY start_time, maintenance_id
+    `,
+    [resourceId],
+  );
+  return result.rows.map((row) => ({
+    id: row.maintenance_id,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    reason: row.reason,
+  }));
+}
+
+async function replaceOwnedMaintenancePeriods(
+  client: DatabaseClient,
+  resourceId: number,
+  periods: MaintenancePeriodInput[] | null,
+): Promise<string | null> {
+  if (periods === null) return null;
+
+  for (const period of periods) {
+    const conflict = await client.query<{ has_conflict: boolean }>(
+      `
+        SELECT EXISTS (
+          SELECT 1
+          FROM "Reservation"
+          WHERE resource_id = $1
+            AND status = 'confirmed'
+            AND start_time < $3::timestamp
+            AND end_time > $2::timestamp
+        ) AS has_conflict
+      `,
+      [resourceId, period.startTime, period.endTime],
+    );
+    if (conflict.rows[0]?.has_conflict) {
+      return "A maintenance period cannot overlap a confirmed reservation.";
+    }
+  }
+
+  await client.query(
+    `
+      DELETE FROM "MaintenancePeriod"
+      WHERE resource_id = $1
+        AND end_time > ${CAMPUS_NOW_SQL}
+    `,
+    [resourceId],
+  );
+
+  for (const period of periods) {
+    await client.query(
+      `
+        INSERT INTO "MaintenancePeriod" (resource_id, start_time, end_time, reason)
+        VALUES ($1, $2::timestamp, $3::timestamp, $4)
+      `,
+      [resourceId, period.startTime, period.endTime, period.reason],
+    );
+  }
+
+  return null;
+}
+
+async function replaceOwnedResourceFeatures(
+  client: DatabaseClient,
+  resourceId: number,
+  features: ResourceFeatureInput[] | null,
+): Promise<void> {
+  if (features === null) return;
+
+  await client.query(
+    `DELETE FROM "ResourceFeature" WHERE resource_id = $1`,
+    [resourceId],
+  );
+  for (const feature of features) {
+    await client.query(
+      `
+        INSERT INTO "ResourceFeature" (resource_id, feature_name, description)
+        VALUES ($1, $2, $3)
+      `,
+      [resourceId, feature.name, feature.description],
+    );
+  }
+}
+
 export async function getOwnedResource(
   client: DatabaseClient,
   resourceId: number,
@@ -636,6 +853,7 @@ export async function getOwnedResource(
   const details = await getResourceDetails(client, resourceId);
   if (!details) return fail(404, "Resource not found.");
   const availability = await getOwnedAvailability(client, resourceId);
+  const maintenancePeriods = await getOwnedMaintenancePeriods(client, resourceId);
   return {
     ok: true,
     value: {
@@ -643,6 +861,7 @@ export async function getOwnedResource(
       hasActiveReservation: ownership.value.active !== null,
       activeReservation: ownership.value.active,
       availability,
+      maintenancePeriods,
     },
   };
 }
@@ -690,10 +909,31 @@ export async function createListing(
         VALUES ($1, $2, $3, $4, $5, $6, $7::interval, $8, $9, $10)
         RETURNING resource_id
       `,
-      [ownerId, input.buildingId, input.categoryId, input.name, input.description, input.locationDescription,
-        intervalValue(input.maxReservationMinutes), input.requiredCredits, input.minUserReviewScore, input.capacity],
+      [
+        ownerId,
+        input.buildingId,
+        input.categoryId,
+        input.name,
+        input.description,
+        input.locationDescription,
+        intervalValue(input.maxReservationMinutes),
+        input.requiredCredits,
+        input.minUserReviewScore,
+        input.capacity,
+      ],
     );
     const resourceId = inserted.rows[0].resource_id;
+
+    const maintenanceError = await replaceOwnedMaintenancePeriods(
+      client,
+      resourceId,
+      input.maintenancePeriods,
+    );
+    if (maintenanceError) {
+      await client.query("ROLLBACK");
+      return fail(409, maintenanceError);
+    }
+    await replaceOwnedResourceFeatures(client, resourceId, input.features);
 
     await insertAvailability(client, resourceId, input.availability);
     const availabilityError = await validateAvailabilitySet(client, resourceId);
@@ -753,6 +993,17 @@ export async function updateListing(
       return fail(400, referenceError);
     }
 
+    const maintenanceError = await replaceOwnedMaintenancePeriods(
+      client,
+      resourceId,
+      input.maintenancePeriods,
+    );
+    if (maintenanceError) {
+      await client.query("ROLLBACK");
+      return fail(409, maintenanceError);
+    }
+    await replaceOwnedResourceFeatures(client, resourceId, input.features);
+
     if (input.availability !== null) {
       await client.query(`DELETE FROM "ResourceAvailability" WHERE resource_id = $1`, [resourceId]);
       await insertAvailability(client, resourceId, input.availability);
@@ -772,8 +1023,19 @@ export async function updateListing(
             required_credits = $8, min_user_review_score = $9, capacity = $10
         WHERE resource_id = $1 AND owner_id = $11
       `,
-      [resourceId, input.buildingId, input.categoryId, input.name, input.description, input.locationDescription,
-        intervalValue(input.maxReservationMinutes), input.requiredCredits, input.minUserReviewScore, input.capacity, ownerId],
+      [
+        resourceId,
+        input.buildingId,
+        input.categoryId,
+        input.name,
+        input.description,
+        input.locationDescription,
+        intervalValue(input.maxReservationMinutes),
+        input.requiredCredits,
+        input.minUserReviewScore,
+        input.capacity,
+        ownerId,
+      ],
     );
 
     if (input.image || input.removeImage) {

@@ -53,6 +53,46 @@ describe("listing input validation", () => {
     expect(result.ok && result.value.minUserReviewScore).toBe(4.13);
   });
 
+  it("parses sorted maintenance periods with their reasons", () => {
+    const result = parseListingInput({
+      ...validBody,
+      maintenancePeriods: JSON.stringify([
+        { startTime: "2026-11-02T10:00", endTime: "2026-11-02T12:00", reason: "Equipment repair" },
+        { startTime: "2026-11-01T10:00", endTime: "2026-11-01T11:00", reason: "Routine cleaning" },
+      ]),
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      value: expect.objectContaining({
+        maintenancePeriods: [
+          { startTime: "2026-11-01 10:00", endTime: "2026-11-01 11:00", reason: "Routine cleaning" },
+          { startTime: "2026-11-02 10:00", endTime: "2026-11-02 12:00", reason: "Equipment repair" },
+        ],
+      }),
+    }));
+  });
+
+  it("parses multiple resource features", () => {
+    const result = parseListingInput({
+      ...validBody,
+      features: JSON.stringify([
+        { name: "Hoop adjustment mechanism", description: "Manual crank system for adjusting hoop height." },
+        { name: "Boundary markings", description: "Dual-color integrated court lines." },
+      ]),
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      value: expect.objectContaining({
+        features: [
+          { name: "Hoop adjustment mechanism", description: "Manual crank system for adjusting hoop height." },
+          { name: "Boundary markings", description: "Dual-color integrated court lines." },
+        ],
+      }),
+    }));
+  });
+
   it.each([
     ["short name", { ...validBody, name: "No" }, /Name/],
     ["bad credits", { ...validBody, requiredCredits: "21" }, /Credits/],
@@ -78,6 +118,23 @@ describe("listing input validation", () => {
       repeat: "daily",
       repeatsUntil: "2026-10-25T10:00",
     }]) }, /cannot exceed/],
+    ["maintenance without a reason", {
+      ...validBody,
+      maintenancePeriods: JSON.stringify([
+        { startTime: "2026-11-01T10:00", endTime: "2026-11-01T11:00", reason: "" },
+      ]),
+    }, /reason/],
+    ["overlapping maintenance periods", {
+      ...validBody,
+      maintenancePeriods: JSON.stringify([
+        { startTime: "2026-11-01T10:00", endTime: "2026-11-01T12:00", reason: "Repair equipment" },
+        { startTime: "2026-11-01T11:00", endTime: "2026-11-01T13:00", reason: "Inspect equipment" },
+      ]),
+    }, /cannot overlap/],
+    ["feature missing description", {
+      ...validBody,
+      features: JSON.stringify([{ name: "Scoreboard", description: "" }]),
+    }, /Feature descriptions/],
     ["zero duration", { ...validBody, maxReservationHours: "0", maxReservationMinutes: "0" }, /at least one minute/],
     ["bad minute value", { ...validBody, maxReservationHours: "0", maxReservationMinutes: "60" }, /at least one minute/],
   ])("rejects %s", (_label, body, message) => {

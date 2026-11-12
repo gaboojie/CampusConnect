@@ -64,6 +64,8 @@ Screenshots have not been added yet. Save images in `docs/screenshots/` and link
    npm run worker:dev
    ```
 
+   This builds the frontend assets before starting Wrangler.
+
 9. Open `http://localhost:8787/` to view the locally-hosted web application.
 
 Run project checks with:

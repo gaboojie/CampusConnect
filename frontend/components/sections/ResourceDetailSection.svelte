@@ -214,7 +214,7 @@
       </div>
 
       <div class="detail-columns">
-        <section class="detail-block">
+        <section class="detail-block feature-detail-block">
           <h3>Features</h3>
           {#if resource.features.length === 0}
             <p class="muted">No features listed.</p>

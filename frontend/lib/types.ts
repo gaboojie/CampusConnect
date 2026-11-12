@@ -50,6 +50,7 @@ export type ResourceSummary = {
   averageRating: number | null
   reviewCount: number
   thumbnailUrl: string | null
+  isUnderMaintenance?: boolean
 }
 
 export type ResourceSearchResponse = {
@@ -75,6 +76,18 @@ export type AvailabilitySlot = {
   repeatsUntil: string | null
 }
 
+export type ResourceMaintenancePeriod = {
+  id?: number
+  startTime: string
+  endTime: string
+  reason: string
+}
+
+export type ResourceFeature = {
+  name: string
+  description: string
+}
+
 export type ResourceDetails = {
   id: number
   name: string
@@ -92,7 +105,7 @@ export type ResourceDetails = {
   createdAt: string
   averageRating: number | null
   reviewCount: number
-  features: Array<{ name: string; description: string }>
+  features: ResourceFeature[]
   weeklyHours: Array<{
     date: string
     weekday: string
@@ -123,6 +136,7 @@ export type ListingDetails = ResourceDetails & {
   hasActiveReservation: boolean
   activeReservation: { startTime: string; endTime: string } | null
   availability: AvailabilitySlot[]
+  maintenancePeriods?: ResourceMaintenancePeriod[]
 }
 
 export type OwnerReservationReview = {
