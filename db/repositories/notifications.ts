@@ -3,10 +3,14 @@ import { CAMPUS_NOW_SQL } from "./resources";
 
 export const RESERVATION_REMINDER_NOTIFICATION = "reservation_reminder" as const;
 export const RESERVATION_CANCELLED_NOTIFICATION = "reservation_cancelled" as const;
+export const RESOURCE_REVIEW_DUE_NOTIFICATION = "resource_review_due" as const;
+export const USER_REVIEW_DUE_NOTIFICATION = "user_review_due" as const;
 
 export type NotificationType =
   | typeof RESERVATION_REMINDER_NOTIFICATION
-  | typeof RESERVATION_CANCELLED_NOTIFICATION;
+  | typeof RESERVATION_CANCELLED_NOTIFICATION
+  | typeof RESOURCE_REVIEW_DUE_NOTIFICATION
+  | typeof USER_REVIEW_DUE_NOTIFICATION;
 
 export type NotificationWorkflowPayload = {
   notificationId: number;
@@ -133,6 +137,91 @@ export async function createReservationCancellationNotification(
 
   await setWorkflowId(client, notificationId);
   return notificationId;
+}
+
+// Review notifications are in-app only: email_status stays NULL so they are
+// visible in the inbox without entering the email workflow.
+export async function createDueReviewNotifications(client: DatabaseClient): Promise<number> {
+  const result = await client.query<{ notification_id: number }>(
+    `
+      INSERT INTO "Notification" (
+        user_id,
+        reservation_id,
+        message,
+        notification_type,
+        scheduled_for
+      )
+      SELECT due.user_id, due.reservation_id, due.message, due.notification_type, ${CAMPUS_NOW_SQL}
+      FROM (
+        SELECT
+          rv.user_id,
+          rv.reservation_id,
+          format(
+            'Please review %s from %s to %s.',
+            resource.name,
+            to_char(rv.start_time, 'Mon DD, YYYY FMHH12:MI AM'),
+            to_char(rv.end_time, 'FMHH12:MI AM')
+          ) AS message,
+          $1::varchar AS notification_type
+        FROM "Reservation" AS rv
+        JOIN "Resource" AS resource ON resource.resource_id = rv.resource_id
+        LEFT JOIN "ResourceReview" AS review ON review.reservation_id = rv.reservation_id
+        WHERE rv.status IN ('confirmed', 'completed')
+          AND rv.end_time <= ${CAMPUS_NOW_SQL}
+          AND review.review_id IS NULL
+
+        UNION ALL
+
+        SELECT
+          resource.owner_id AS user_id,
+          rv.reservation_id,
+          format(
+            'Please review %s''s reservation of %s from %s to %s.',
+            reserver.username,
+            resource.name,
+            to_char(rv.start_time, 'Mon DD, YYYY FMHH12:MI AM'),
+            to_char(rv.end_time, 'FMHH12:MI AM')
+          ) AS message,
+          $2::varchar AS notification_type
+        FROM "Reservation" AS rv
+        JOIN "Resource" AS resource ON resource.resource_id = rv.resource_id
+        JOIN "User" AS reserver ON reserver.user_id = rv.user_id
+        LEFT JOIN "UserReview" AS review ON review.reservation_id = rv.reservation_id
+        WHERE rv.status = 'completed'
+          AND rv.end_time > ${CAMPUS_NOW_SQL} - interval '7 days'
+          AND rv.end_time <= ${CAMPUS_NOW_SQL}
+          AND rv.user_id <> resource.owner_id
+          AND review.reservation_id IS NULL
+      ) AS due
+      ON CONFLICT (user_id, reservation_id, notification_type)
+        WHERE notification_type IN ('resource_review_due', 'user_review_due')
+      DO NOTHING
+      RETURNING notification_id
+    `,
+    [RESOURCE_REVIEW_DUE_NOTIFICATION, USER_REVIEW_DUE_NOTIFICATION],
+  );
+
+  return result.rows.length;
+}
+
+export async function markReviewNotificationRead(
+  client: DatabaseClient,
+  input: {
+    userId: number;
+    reservationId: number;
+    notificationType: typeof RESOURCE_REVIEW_DUE_NOTIFICATION | typeof USER_REVIEW_DUE_NOTIFICATION;
+  },
+): Promise<void> {
+  await client.query(
+    `
+      UPDATE "Notification"
+      SET read_at = COALESCE(read_at, ${CAMPUS_NOW_SQL})
+      WHERE user_id = $1
+        AND reservation_id = $2
+        AND notification_type = $3
+    `,
+    [input.userId, input.reservationId, input.notificationType],
+  );
 }
 
 export async function skipPendingReservationReminders(

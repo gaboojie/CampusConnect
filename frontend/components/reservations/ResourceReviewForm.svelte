@@ -56,6 +56,7 @@
     </div>
 
     <form class="resource-review-form" on:submit|preventDefault={submit}>
+      <p class="review-description">This is a resource review. Rate the campus resource so other students know what to expect.</p>
       <fieldset class="rating-fieldset">
         <legend>Rating</legend>
         <div class="star-picker" role="radiogroup" aria-label="Rating from 1 to 5 stars">

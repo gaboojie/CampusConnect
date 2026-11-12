@@ -13,6 +13,8 @@
   const TYPE_LABELS: Record<string, string> = {
     reservation_reminder: 'Reminder',
     reservation_cancelled: 'Cancelled',
+    resource_review_due: 'Resource review',
+    user_review_due: 'Reservation review',
   }
 
   let root: HTMLDivElement
@@ -200,7 +202,9 @@
                 </div>
                 <p>{notification.message}</p>
                 <div class="notification-item-actions">
-                  {#if notification.reservationId !== null}
+                  {#if notification.type === 'resource_review_due' || notification.type === 'user_review_due'}
+                    <a class="text-link" href={`${appPrefix}#/announcements?tab=reviews`} on:click={close}>Open reviews</a>
+                  {:else if notification.reservationId !== null}
                     <a class="text-link" href={`${appPrefix}#/reservations`} on:click={close}>View my reservations</a>
                   {/if}
                   {#if !notification.isRead}

@@ -180,7 +180,7 @@
     {:else if route.id === 'activity'}
       <ActivitySection />
     {:else if route.id === 'announcements'}
-      <AnnouncementsSection />
+      <AnnouncementsSection query={location.query} />
     {:else}
       <PlaceholderSection {route} />
     {/if}

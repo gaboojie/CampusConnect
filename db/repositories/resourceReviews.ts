@@ -1,5 +1,6 @@
 import type { DatabaseClient } from "../client";
 import { CAMPUS_NOW_SQL, type Validation } from "./resources";
+import { markReviewNotificationRead, RESOURCE_REVIEW_DUE_NOTIFICATION } from "./notifications";
 
 const MAX_REASON_LENGTH = 500;
 
@@ -135,6 +136,11 @@ export async function createResourceReview(
       [reservationId, row.resource_id, userId, input.rating, input.reason, input.isAnonymous],
     );
     const review = inserted.rows[0];
+    await markReviewNotificationRead(client, {
+      userId,
+      reservationId,
+      notificationType: RESOURCE_REVIEW_DUE_NOTIFICATION,
+    });
 
     return {
       ok: true,

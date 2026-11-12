@@ -152,6 +152,20 @@ export type OwnerUserReview = {
   } | null
 }
 
+export type UserReviewTask = {
+  reservationId: number
+  resource: NamedOption
+  building: NamedOption
+  reserver: { id: number; username: string }
+  startTime: string
+  endTime: string
+}
+
+export type ReviewInbox = {
+  resourceReviews: Reservation[]
+  userReviews: UserReviewTask[]
+}
+
 export type UserReviewItem = {
   id: number
   reservationId: number

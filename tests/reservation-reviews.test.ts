@@ -135,7 +135,8 @@ describe("reservation review endpoints", () => {
         reason: "Returned everything in good condition.",
         created_at: "2026-10-20T11:30:00",
         is_anonymous_review: true,
-      }]);
+      }])
+      .respond('UPDATE "Notification" SET read_at', []);
     const app = createApp({ createDatabaseClient: () => database.createClient() });
 
     const response = await app.request(

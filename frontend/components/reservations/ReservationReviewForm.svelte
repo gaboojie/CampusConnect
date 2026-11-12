@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { OwnerUserReview } from '../../lib/types'
+  import type { OwnerUserReview, UserReviewTask } from '../../lib/types'
 
-  export let reservation: OwnerUserReview
+  export let reservation: OwnerUserReview | UserReviewTask
   export let onSubmit: (input: { reservationId: number; rating: number; reason: string | null; isAnonymous: boolean }) => Promise<void>
   export let onClose: () => void
 
@@ -47,12 +47,16 @@
       <div>
         <p class="eyebrow">Past reservation</p>
         <h2 id="reservation-review-title">Review {reservation.reserver.username}</h2>
-        <p class="muted">{reservation.startTime.replace('T', ' ')} – {reservation.endTime.slice(11, 16)}</p>
+        <p class="muted">
+          {#if 'resource' in reservation}{reservation.resource.name} · {/if}
+          {reservation.startTime.replace('T', ' ')} – {reservation.endTime.slice(11, 16)}
+        </p>
       </div>
       <button type="button" class="modal-close" aria-label="Close review form" on:click={close}>×</button>
     </div>
 
     <form class="reservation-review-form" on:submit|preventDefault={submit}>
+      <p class="review-description">This is a reservation review. Rate the student who used your resource so other resource owners know what to expect.</p>
       <fieldset class="rating-fieldset">
         <legend>Rating</legend>
         <div class="star-picker" role="radiogroup" aria-label="Rating from 1 to 5 stars">

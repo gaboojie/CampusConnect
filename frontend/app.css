@@ -2238,6 +2238,91 @@ a.resource-card:hover {
   background: #630031;
 }
 
+.announcement-filters {
+  margin-top: 0.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.announcement-filters .segment {
+  color: #630031;
+}
+
+.announcement-filters .segment:hover:not(:disabled) {
+  background: #ead7e0;
+}
+
+.announcement-filters .segment.active,
+.announcement-filters .segment.active:hover:not(:disabled) {
+  color: #fff;
+  background: #630031;
+}
+
+.reviews-intro {
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.2rem;
+  box-shadow: none;
+}
+
+.reviews-intro h3,
+.reviews-intro p {
+  margin: 0;
+}
+
+.reviews-intro p {
+  margin-top: 0.35rem;
+}
+
+.review-task-section + .review-task-section {
+  margin-top: 2rem;
+}
+
+.review-task-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.review-task-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.2rem;
+  box-shadow: none;
+}
+
+.review-task-card > div {
+  min-width: 0;
+}
+
+.review-task-card h4 {
+  margin: 0.35rem 0 0.15rem;
+  color: #1f2d3d;
+  font-size: 1rem;
+}
+
+.review-task-card p {
+  margin: 0;
+}
+
+.review-task-description {
+  margin-top: 0.45rem !important;
+  color: #344258;
+}
+
+@media (max-width: 560px) {
+  .review-task-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .review-task-card button {
+    width: 100%;
+  }
+}
+
 .announcement-card {
   display: grid;
   gap: 0.5rem;
@@ -3044,6 +3129,12 @@ a.resource-card:hover {
   display: grid;
   gap: 1rem;
   margin-top: 1.25rem;
+}
+
+.review-description {
+  margin: 0;
+  color: #344258;
+  line-height: 1.5;
 }
 
 .rating-fieldset {

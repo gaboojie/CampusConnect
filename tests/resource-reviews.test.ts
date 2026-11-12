@@ -69,7 +69,8 @@ describe("resource review endpoint", () => {
         reason: "Everything was ready.",
         created_at: "2026-10-20T11:30:00",
         is_anonymous_review: false,
-      }]);
+      }])
+      .respond('UPDATE "Notification" SET read_at', []);
     const app = createApp({ createDatabaseClient: () => database.createClient() });
 
     const response = await app.request(

@@ -1,5 +1,6 @@
 import type { DatabaseClient } from "../client";
 import { CAMPUS_NOW_SQL, parsePositiveId, type Validation } from "./resources";
+import { markReviewNotificationRead, USER_REVIEW_DUE_NOTIFICATION } from "./notifications";
 
 const REVIEW_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 100;
@@ -259,6 +260,11 @@ export async function createUserReview(
       [input.reservationId, ownerId, row.reserver_id, input.rating, input.reason, input.isAnonymous],
     );
     const review = inserted.rows[0];
+    await markReviewNotificationRead(client, {
+      userId: ownerId,
+      reservationId: input.reservationId,
+      notificationType: USER_REVIEW_DUE_NOTIFICATION,
+    });
     return {
       ok: true,
       value: {

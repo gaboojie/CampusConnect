@@ -56,6 +56,7 @@ import {
   updateListing,
 } from "../db/repositories/listings";
 import { getAnnouncements, parseAnnouncementQuery } from "../db/repositories/announcements";
+import { listReviewInbox } from "../db/repositories/reviewInbox";
 import { getMyAnalytics } from "../db/repositories/analytics";
 import {
   findMapBuildingById,
@@ -113,6 +114,9 @@ import {
   listCreditTransactions,
   parseCreditTransactionQuery,
 } from "../db/repositories/credits";
+import {
+  createDueReviewNotifications,
+} from "../db/repositories/notifications";
 import {
   NotificationWorkflow,
   repairPendingNotificationWorkflows,
@@ -1158,6 +1162,23 @@ export function createApp(options: AppOptions = {}) {
     }
   });
 
+  app.get("/api/reviews/mine", async (c) => {
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const reviews = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => listReviewInbox(client, c.get("user").userId),
+      );
+      return c.json(reviews);
+    } catch {
+      return c.json({ error: "Unable to load your review tasks right now." }, 503);
+    }
+  });
+
   const runReservationWrite = async (
     c: Context<AppEnv>,
     successStatus: 200 | 201,
@@ -1709,6 +1730,21 @@ export async function runMonthlyCreditSweep(
   );
 }
 
+export async function runReviewNotificationSweep(
+  env: Pick<Bindings, "DB">,
+  createDatabaseClient: DatabaseClientFactory = defaultDatabaseClientFactory,
+): Promise<number> {
+  if (!env.DB) {
+    throw new Error("Database is not configured.");
+  }
+
+  return withDatabase(
+    env.DB.connectionString,
+    createDatabaseClient,
+    (client) => createDueReviewNotifications(client),
+  );
+}
+
 export async function scheduled(
   controller: ScheduledController,
   env: Bindings,
@@ -1731,6 +1767,8 @@ export async function scheduled(
   if (controller.cron !== "*/15 * * * *") return;
 
   try {
+    const created = await runReviewNotificationSweep(env, createDatabaseClient);
+    if (created > 0) console.info(`Created ${created} review notification(s).`);
     await repairPendingNotificationWorkflows(env, env.NOTIFICATION_WORKFLOW);
   } catch (error) {
     console.error(`Notification repair sweep failed: ${error instanceof Error ? error.message : String(error)}`);

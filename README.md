@@ -11,8 +11,8 @@ _Authors: Faria Binta Awal, Ashwaq Alaklabi, Rokeshuvaraj Nagarajan, & Gabriel J
 - **Availability calendar:** every resource page has a day grid of half-hour slots. Available, booked, your own, maintenance, and closed times are colored differently. Clicking an available slot opens the reservation form, prefilled with up to two hours (shortened to the gap before the next booking, maintenance, or closing time).
 - **Reservations and credits:** reserve, reschedule, and cancel. Each booking costs credits, and cancellations are refunded.
 - **Listings:** members who may add resources can create and manage their own listings, including images stored in Cloudflare R2.
-- **Notifications:** email reminders and cancellation notices are sent through Cloudflare Workflows. The bell in the top bar opens an in-app dropdown with an unread count, per-item and bulk "mark as read", and an All/Unread filter.
-- **Announcements:** current maintenance notices and newly listed resources.
+- **Notifications:** email reminders and cancellation notices are sent through Cloudflare Workflows. The bell in the top bar opens an in-app dropdown with an unread count, per-item and bulk "mark as read", and an All/Unread filter. Review tasks appear as in-app notifications.
+- **Announcements:** current maintenance notices, newly listed resources, and a centralized Reviews tab for pending resource and reservation reviews.
 - **Maps:** an interactive Google Maps view of Virginia Tech's Blacksburg campus, centered on the Drillfield.
 - **Admin panel** (`/admin`, admins only):
   - Overview with charts of activity, reservation status, and user roles.
@@ -127,7 +127,8 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
 - `003_notification_read.sql` adds `"Notification".read_at`, which tracks read state for the in-app notifications dropdown.
 - `004_login_lockout.sql` adds `"User".failed_login_attempts` and `"User".locked_until`, which power the five-attempt sign-in lockout.
 - `005_review_schema_backfill.sql` renames `ReservationReview` to `UserReview`, adds the required `ResourceReview.reservation_id` relationship, and backfills existing resource reviews.
-- `003`, `004`, and `005` are additive and safe to re-run. An existing database picks them up by running the migrate command, with no reset needed. Run them on Neon `dev` first, then on `main` after review.
+- `006_review_notifications.sql` adds the idempotency index used by the review-notification sweep.
+- `003` through `006` are additive and safe to re-run. An existing database picks them up by running the migrate command, with no reset needed. Run them on Neon `dev` first, then on `main` after review.
 - `db/scripts/migrate.ts` applies files in order and records applied versions in `schema_migrations`, so already-applied files are skipped.
 - `npm run migrate:dev` and `npm run migrate:prod` automatically use `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` from `.env.dev` or `.env.prod`, respectively. For example:
 
