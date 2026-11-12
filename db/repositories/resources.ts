@@ -97,6 +97,9 @@ export type ResourceDetails = {
   };
   capacity: number;
   requiredCredits: number;
+  minUserReviewScore: number | null;
+  viewerReviewScore: number | null;
+  viewerReviewCount: number;
   maxReservationMinutes: number | null;
   ownerUsername: string;
   createdAt: string;
@@ -547,6 +550,7 @@ type ResourceDetailRow = {
   location_description: string;
   capacity: number;
   required_credits: number;
+  min_user_review_score: number | string | null;
   max_reservation_minutes: number | null;
   created_at: string;
   category_id: number;
@@ -562,6 +566,8 @@ type ResourceDetailRow = {
   image_alt_text: string | null;
   average_rating: number | string | null;
   review_count: number | string;
+  viewer_review_score: number | string | null;
+  viewer_review_count: number | string;
 };
 
 // Weekly hours are not stored per weekday: ResourceAvailability holds a window that
@@ -632,7 +638,23 @@ export const WEEKLY_HOURS_SQL = `
 export async function getResourceDetails(
   client: DatabaseClient,
   resourceId: number,
+  viewerUserId?: number,
 ): Promise<ResourceDetails | null> {
+  const viewerScoreSelect = viewerUserId === undefined
+    ? "NULL::float8 AS viewer_review_score, 0::integer AS viewer_review_count"
+    : "viewer_rating.average_rating AS viewer_review_score, COALESCE(viewer_rating.review_count, 0) AS viewer_review_count";
+  const viewerScoreJoin = viewerUserId === undefined
+    ? ""
+    : `
+      LEFT JOIN LATERAL (
+        SELECT
+          ROUND(AVG(rr.rating)::numeric, 2)::float8 AS average_rating,
+          COUNT(*)::integer AS review_count
+        FROM "ReservationReview" AS rr
+        WHERE rr.reviewee_user_id = $2
+      ) AS viewer_rating ON TRUE
+    `;
+
   const resourceResult = await client.query<ResourceDetailRow>(
     `
       SELECT
@@ -655,8 +677,10 @@ export async function getResourceDetails(
         u.username AS owner_username,
         img.image_id,
         img.alt_text AS image_alt_text,
+        r.min_user_review_score,
         rating.average_rating,
-        COALESCE(rating.review_count, 0) AS review_count
+        COALESCE(rating.review_count, 0) AS review_count,
+        ${viewerScoreSelect}
       FROM "Resource" AS r
       JOIN "ResourceCategory" AS c ON c.category_id = r.category_id
       JOIN "Building" AS b ON b.building_id = r.building_id
@@ -671,9 +695,10 @@ export async function getResourceDetails(
         WHERE resource_id = $1
         GROUP BY resource_id
       ) AS rating ON rating.resource_id = r.resource_id
+      ${viewerScoreJoin}
       WHERE r.resource_id = $1
     `,
-    [resourceId],
+    viewerUserId === undefined ? [resourceId] : [resourceId, viewerUserId],
   );
   const resource = resourceResult.rows[0];
 
@@ -771,6 +796,9 @@ export async function getResourceDetails(
     },
     capacity: resource.capacity,
     requiredCredits: resource.required_credits,
+    minUserReviewScore: toNumberOrNull(resource.min_user_review_score),
+    viewerReviewScore: toNumberOrNull(resource.viewer_review_score),
+    viewerReviewCount: Number(resource.viewer_review_count ?? 0),
     maxReservationMinutes: toNumberOrNull(resource.max_reservation_minutes),
     ownerUsername: resource.owner_username,
     createdAt: resource.created_at,

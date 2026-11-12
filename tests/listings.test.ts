@@ -33,6 +33,7 @@ describe("listing input validation", () => {
         buildingId: 1,
         categoryId: 1,
         requiredCredits: 2,
+        minUserReviewScore: null,
         capacity: 4,
         maxReservationMinutes: 150,
         availability: [{
@@ -46,9 +47,17 @@ describe("listing input validation", () => {
     });
   });
 
+  it("rounds an optional minimum user review score to two decimals", () => {
+    const result = parseListingInput({ ...validBody, minUserReviewScore: "4.126" });
+
+    expect(result.ok && result.value.minUserReviewScore).toBe(4.13);
+  });
+
   it.each([
     ["short name", { ...validBody, name: "No" }, /Name/],
     ["bad credits", { ...validBody, requiredCredits: "21" }, /Credits/],
+    ["minimum score below range", { ...validBody, minUserReviewScore: "0" }, /Minimum user review score/],
+    ["minimum score above range", { ...validBody, minUserReviewScore: "5.01" }, /Minimum user review score/],
     ["bad capacity", { ...validBody, capacity: "101" }, /Capacity/],
     ["empty availability", { ...validBody, availability: "[]" }, /at least one availability/],
     ["missing repeat end", { ...validBody, availability: JSON.stringify([{

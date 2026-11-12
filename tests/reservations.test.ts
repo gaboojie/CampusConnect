@@ -36,6 +36,7 @@ type FakeResource = {
   name: string;
   maxMinutes: number | null;
   requiredCredits: number;
+  minUserReviewScore: number | null;
   // Daily availability window.
   opensAt: string;
   closesAt: string;
@@ -67,9 +68,10 @@ class FakeReservationDatabase {
   sessions = new Map<string, number>();
   bannedUsers = new Set<number>();
   resources = new Map<number, FakeResource>([
-    [1, { name: "Newman Group Study Room 1", maxMinutes: 120, requiredCredits: 2, opensAt: "08:00", closesAt: "23:00" }],
-    [2, { name: "Squires Meeting Room B", maxMinutes: null, requiredCredits: 3, opensAt: "08:00", closesAt: "23:00" }],
+    [1, { name: "Newman Group Study Room 1", maxMinutes: 120, requiredCredits: 2, minUserReviewScore: null, opensAt: "08:00", closesAt: "23:00" }],
+    [2, { name: "Squires Meeting Room B", maxMinutes: null, requiredCredits: 3, minUserReviewScore: null, opensAt: "08:00", closesAt: "23:00" }],
   ]);
+  reviewScores = new Map<number, { score: number | null; count: number }>();
   balances = new Map<number, number>([[6, 20], [7, 20]]);
   credits: FakeCreditTransaction[] = [];
   nextTransactionId = 500;
@@ -92,6 +94,10 @@ class FakeReservationDatabase {
 
   async addSession(token: string, userId: number) {
     this.sessions.set(await hashSessionToken(token), userId);
+  }
+
+  setReviewScore(userId: number, score: number | null, count: number) {
+    this.reviewScores.set(userId, { score, count });
   }
 
   addReservation(reservation: Omit<FakeReservation, "id" | "createdAt"> & { id?: number; createdAt?: string }) {
@@ -254,12 +260,20 @@ class FakeReservationDatabase {
         const id = values[0] as number;
         if (this.locksEnabled) held.push(await this.acquire(`resource:${id}`));
         const resource = this.resources.get(id);
-        return resource ? [{ resource_id: id, required_credits: resource.requiredCredits }] : [];
+        return resource
+          ? [{ resource_id: id, required_credits: resource.requiredCredits, min_user_review_score: resource.minUserReviewScore }]
+          : [];
       }
       if (query === LOCK_USER) {
         const id = values[0] as number;
         if (this.locksEnabled) held.push(await this.acquire(`user:${id}`));
-        return [{ is_banned: this.bannedUsers.has(id), credit_balance: this.lockReportsBalance ?? this.balances.get(id) }];
+        const review = this.reviewScores.get(id) ?? { score: null, count: 0 };
+        return [{
+          is_banned: this.bannedUsers.has(id),
+          credit_balance: this.lockReportsBalance ?? this.balances.get(id),
+          user_review_score: review.score,
+          user_review_count: review.count,
+        }];
       }
       if (query === STAMP_TAKEN) {
         const userId = values[0] as number;
@@ -518,6 +532,46 @@ describe("POST /api/reservations", () => {
     await expectRejected(await request("POST", "/api/reservations", { resourceId: 1, ...slot }), 403, /suspended/);
     expect(database.queries().some(isWrite)).toBe(false);
     expect(database.reservations).toEqual([]);
+  });
+
+  it("rejects a user with no received review score and returns structured details", async () => {
+    const { database, request } = await setup();
+    database.resources.get(1)!.minUserReviewScore = 4;
+
+    const response = await request("POST", "/api/reservations", { resourceId: 1, ...slot });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: "You need an average review score of at least 4.00 to reserve this resource.",
+      code: "minimum_user_review_score",
+      minUserReviewScore: 4,
+      userReviewScore: null,
+      userReviewCount: 0,
+    });
+    expect(database.reservations).toEqual([]);
+    expect(database.creditsOf(MAYA, "reservation_charge")).toEqual([]);
+    expect(database.queries().some(isWrite)).toBe(false);
+    expect(database.queries().at(-1)).toBe("ROLLBACK");
+  });
+
+  it.each([
+    ["below", 3.99, 2, 409],
+    ["equal", 4, 1, 201],
+    ["above", 4.5, 3, 201],
+  ])("handles a %s received review score", async (_label, score, count, status) => {
+    const { database, request } = await setup();
+    database.resources.get(1)!.minUserReviewScore = 4;
+    database.setReviewScore(MAYA, score, count);
+
+    const response = await request("POST", "/api/reservations", { resourceId: 1, ...slot });
+
+    expect(response.status).toBe(status);
+    if (status === 409) {
+      expect(database.reservations).toEqual([]);
+      expect(database.queries().some(isWrite)).toBe(false);
+    } else {
+      expect(database.reservations).toHaveLength(1);
+    }
   });
 
   describe("conflicts return 409, roll back, and write nothing", () => {

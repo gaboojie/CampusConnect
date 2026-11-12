@@ -63,7 +63,19 @@ export type MyReservations = {
 
 export type ServiceResult<T> =
   | { ok: true; value: T; notificationIds?: number[]; credits?: CreditChange }
-  | { ok: false; status: 400 | 403 | 404 | 409; error: string };
+  | {
+      ok: false;
+      status: 400 | 403 | 404 | 409;
+      error: string;
+      details?: ReservationErrorDetails;
+    };
+
+export type ReservationErrorDetails = {
+  code: "minimum_user_review_score";
+  minUserReviewScore: number;
+  userReviewScore: number | null;
+  userReviewCount: number;
+};
 
 type ReservationRow = {
   reservation_id: number;
@@ -167,7 +179,7 @@ function reservationSelectSql(source: string): string {
 }
 
 export const LOCK_RESOURCE_SQL = `
-  SELECT resource_id, required_credits
+  SELECT resource_id, required_credits, min_user_review_score
   FROM "Resource"
   WHERE resource_id = $1
   FOR UPDATE
@@ -178,9 +190,21 @@ export const LOCK_RESOURCE_SQL = `
 // foreign-key inserts that reference the user (sessions, notifications). The
 // balance it returns is the latest committed value, because the row is locked.
 export const LOCK_USER_SQL = `
-  SELECT is_banned, credit_balance
-  FROM "User"
-  WHERE user_id = $1
+  SELECT
+    u.is_banned,
+    u.credit_balance,
+    (
+      SELECT ROUND(AVG(rr.rating)::numeric, 2)::float8
+      FROM "ReservationReview" AS rr
+      WHERE rr.reviewee_user_id = u.user_id
+    ) AS user_review_score,
+    (
+      SELECT COUNT(*)::integer
+      FROM "ReservationReview" AS rr
+      WHERE rr.reviewee_user_id = u.user_id
+    ) AS user_review_count
+  FROM "User" AS u
+  WHERE u.user_id = $1
   FOR NO KEY UPDATE
 `;
 
@@ -294,7 +318,13 @@ async function inTransaction<T>(
   }
 }
 
-type LockedResourceAndUser = { requiredCredits: number; creditBalance: number };
+type LockedResourceAndUser = {
+  requiredCredits: number;
+  creditBalance: number;
+  minUserReviewScore: number | null;
+  userReviewScore: number | null;
+  userReviewCount: number;
+};
 
 // Takes the resource lock, then the user lock (always in this order), and
 // rejects suspended accounts unless told otherwise.
@@ -304,12 +334,20 @@ async function lockResourceAndUser(
   userId: number,
   options: { rejectBanned: boolean } = { rejectBanned: true },
 ): Promise<ServiceResult<LockedResourceAndUser>> {
-  const resource = await client.query<{ required_credits: number }>(LOCK_RESOURCE_SQL, [resourceId]);
+  const resource = await client.query<{
+    required_credits: number;
+    min_user_review_score: number | string | null;
+  }>(LOCK_RESOURCE_SQL, [resourceId]);
   if (resource.rows.length === 0) {
     return fail(404, "Resource not found.");
   }
 
-  const user = await client.query<{ is_banned: boolean; credit_balance: number }>(LOCK_USER_SQL, [userId]);
+  const user = await client.query<{
+    is_banned: boolean;
+    credit_balance: number;
+    user_review_score: number | string | null;
+    user_review_count: number | string;
+  }>(LOCK_USER_SQL, [userId]);
   const row = user.rows[0];
   if (!row || (options.rejectBanned && row.is_banned)) {
     return fail(403, "Your account is suspended and cannot make reservations.");
@@ -317,7 +355,37 @@ async function lockResourceAndUser(
 
   return {
     ok: true,
-    value: { requiredCredits: resource.rows[0].required_credits, creditBalance: row.credit_balance },
+    value: {
+      requiredCredits: resource.rows[0].required_credits,
+      creditBalance: row.credit_balance,
+      minUserReviewScore: resource.rows[0].min_user_review_score === null
+        ? null
+        : Number(resource.rows[0].min_user_review_score),
+      userReviewScore: row.user_review_score === null || row.user_review_score === undefined
+        ? null
+        : Number(row.user_review_score),
+      userReviewCount: Number(row.user_review_count ?? 0),
+    },
+  };
+}
+
+function minimumReviewScoreFailure(
+  minimum: number | null,
+  score: number | null,
+  count: number,
+): ServiceResult<never> | null {
+  if (minimum === null || (score !== null && score >= minimum)) return null;
+
+  return {
+    ok: false,
+    status: 409,
+    error: `You need an average review score of at least ${minimum.toFixed(2)} to reserve this resource.`,
+    details: {
+      code: "minimum_user_review_score",
+      minUserReviewScore: minimum,
+      userReviewScore: score,
+      userReviewCount: count,
+    },
   };
 }
 
@@ -352,6 +420,13 @@ export async function createReservation(
   return inTransaction<Reservation>(client, async () => {
     const locked = await lockResourceAndUser(client, input.resourceId, userId);
     if (!locked.ok) return locked;
+
+    const reviewProblem = minimumReviewScoreFailure(
+      locked.value.minUserReviewScore,
+      locked.value.userReviewScore,
+      locked.value.userReviewCount,
+    );
+    if (reviewProblem) return reviewProblem;
 
     const problem = await checkSlot(client, input.resourceId, input.slot, userId);
     if (problem) return problem;

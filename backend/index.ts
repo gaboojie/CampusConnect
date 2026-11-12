@@ -951,7 +951,7 @@ export function createApp(options: AppOptions = {}) {
       const resource = await withDatabase(
         c.env.DB.connectionString,
         createDatabaseClient,
-        (client) => getResourceDetails(client, resourceId),
+        (client) => getResourceDetails(client, resourceId, c.get("user").userId),
       );
 
       if (!resource) {
@@ -1167,7 +1167,10 @@ export function createApp(options: AppOptions = {}) {
       const result = await withDatabase(c.env.DB.connectionString, createDatabaseClient, work);
 
       if (!result.ok) {
-        return c.json({ error: result.error }, result.status);
+        return c.json(
+          result.details ? { error: result.error, ...result.details } : { error: result.error },
+          result.status,
+        );
       }
       enqueueNotificationWorkflows(c, result.notificationIds);
       return c.json(

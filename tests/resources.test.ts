@@ -43,6 +43,9 @@ const detailRow = {
   image_alt_text: null,
   average_rating: null,
   review_count: 0,
+  min_user_review_score: 4.5,
+  viewer_review_score: 4.25,
+  viewer_review_count: 2,
 };
 
 function setup(database = new FakeReadDatabase()) {
@@ -329,6 +332,9 @@ describe("GET /api/resources/:id", () => {
       maxReservationMinutes: 180,
       averageRating: null,
       reviewCount: 0,
+      minUserReviewScore: 4.5,
+      viewerReviewScore: 4.25,
+      viewerReviewCount: 2,
       features: [{ name: "Microphone", description: "Wireless microphone." }],
       weeklyHours: [
         { date: "2026-10-17", weekday: "Saturday", windows: [] },
@@ -342,7 +348,8 @@ describe("GET /api/resources/:id", () => {
         { id: 8, rating: 4, reason: "Warm inside.", createdAt: "2026-09-25T10:00:00", reviewerUsername: null },
       ],
     });
-    expect(database.queries.every((query) => query.values.length === 1 && query.values[0] === 22)).toBe(true);
+    expect(database.queries[0].values).toEqual([22, 6]);
+    expect(database.queries.slice(1).every((query) => query.values.length === 1 && query.values[0] === 22)).toBe(true);
     expectReadOnly(database.queries);
   });
 

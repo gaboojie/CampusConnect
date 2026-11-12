@@ -31,6 +31,7 @@ export type ListingInput = {
   buildingId: number;
   categoryId: number;
   requiredCredits: number;
+  minUserReviewScore: number | null;
   capacity: number;
   maxReservationMinutes: number | null;
   availability: AvailabilityInput[] | null;
@@ -75,6 +76,14 @@ function optionalInteger(body: Record<string, unknown>, name: string): number | 
   if (!/^\d+$/.test(value)) return undefined;
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) ? parsed : undefined;
+}
+
+function optionalReviewScore(body: Record<string, unknown>, name: string): number | null | undefined {
+  const value = text(body, name);
+  if (!value) return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return undefined;
+  return Number(parsed.toFixed(2));
 }
 
 function parseImage(value: unknown): File | null | undefined {
@@ -179,6 +188,7 @@ export function parseListingInput(body: Record<string, unknown>): Validation<Lis
   const buildingId = integer(body, "buildingId");
   const categoryId = integer(body, "categoryId");
   const requiredCredits = integer(body, "requiredCredits");
+  const minUserReviewScore = optionalReviewScore(body, "minUserReviewScore");
   const capacity = integer(body, "capacity");
   const hours = optionalInteger(body, "maxReservationHours");
   const minutes = optionalInteger(body, "maxReservationMinutes");
@@ -197,6 +207,12 @@ export function parseListingInput(body: Record<string, unknown>): Validation<Lis
   if (categoryId === null || categoryId < 1) errors.push("Choose a category.");
   if (requiredCredits === null || requiredCredits < 1 || requiredCredits > 20) {
     errors.push("Credits must be a whole number between 1 and 20.");
+  }
+  if (
+    minUserReviewScore === undefined ||
+    (minUserReviewScore !== null && (minUserReviewScore < 1 || minUserReviewScore > 5))
+  ) {
+    errors.push("Minimum user review score must be between 1.00 and 5.00.");
   }
   if (capacity === null || capacity < 1 || capacity > 100) {
     errors.push("Capacity must be a whole number between 1 and 100.");
@@ -226,6 +242,7 @@ export function parseListingInput(body: Record<string, unknown>): Validation<Lis
       buildingId: buildingId!,
       categoryId: categoryId!,
       requiredCredits: requiredCredits!,
+      minUserReviewScore: minUserReviewScore!,
       capacity: capacity!,
       maxReservationMinutes:
         hours === null && minutes === null ? null : (hours ?? 0) * 60 + (minutes ?? 0),
@@ -668,13 +685,13 @@ export async function createListing(
       `
         INSERT INTO "Resource" (
           owner_id, building_id, category_id, name, description, location_description,
-          max_reservation_time, required_credits, capacity
+          max_reservation_time, required_credits, min_user_review_score, capacity
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7::interval, $8, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7::interval, $8, $9, $10)
         RETURNING resource_id
       `,
       [ownerId, input.buildingId, input.categoryId, input.name, input.description, input.locationDescription,
-        intervalValue(input.maxReservationMinutes), input.requiredCredits, input.capacity],
+        intervalValue(input.maxReservationMinutes), input.requiredCredits, input.minUserReviewScore, input.capacity],
     );
     const resourceId = inserted.rows[0].resource_id;
 
@@ -752,11 +769,11 @@ export async function updateListing(
         UPDATE "Resource"
         SET building_id = $2, category_id = $3, name = $4, description = $5,
             location_description = $6, max_reservation_time = $7::interval,
-            required_credits = $8, capacity = $9
-        WHERE resource_id = $1 AND owner_id = $10
+            required_credits = $8, min_user_review_score = $9, capacity = $10
+        WHERE resource_id = $1 AND owner_id = $11
       `,
       [resourceId, input.buildingId, input.categoryId, input.name, input.description, input.locationDescription,
-        intervalValue(input.maxReservationMinutes), input.requiredCredits, input.capacity, ownerId],
+        intervalValue(input.maxReservationMinutes), input.requiredCredits, input.minUserReviewScore, input.capacity, ownerId],
     );
 
     if (input.image || input.removeImage) {

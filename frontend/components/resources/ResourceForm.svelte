@@ -14,6 +14,9 @@
   let buildingId = initial ? String(initial.building.id) : ''
   let categoryId = initial ? String(initial.category.id) : ''
   let requiredCredits = initial ? String(initial.requiredCredits) : '1'
+  let minUserReviewScore = initial?.minUserReviewScore === null || initial?.minUserReviewScore === undefined
+    ? ''
+    : initial.minUserReviewScore.toFixed(2)
   let capacity = initial ? String(initial.capacity) : '1'
   let hours = initial?.maxReservationMinutes === null || initial?.maxReservationMinutes === undefined
     ? ''
@@ -219,6 +222,11 @@
           <label>
             Capacity
             <input name="capacity" type="number" min="1" max="100" step="1" bind:value={capacity} required disabled={submitting} />
+          </label>
+          <label class="form-field-wide">
+            Minimum user review score <span class="optional">(optional)</span>
+            <input name="minUserReviewScore" type="number" min="1" max="5" step="0.01" bind:value={minUserReviewScore} disabled={submitting} />
+            <span class="form-help">Users must have this average received rating to reserve the resource.</span>
           </label>
         </div>
         <fieldset class="duration-fields">

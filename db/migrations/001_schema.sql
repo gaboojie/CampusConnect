@@ -137,6 +137,7 @@ CREATE TABLE "Resource" (
     location_description  text           NOT NULL,
     max_reservation_time  interval,
     required_credits      integer        NOT NULL,
+    min_user_review_score numeric(3,2),
     capacity              integer        NOT NULL,
     created_at            timestamp      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     resource_image_id     integer,
@@ -144,6 +145,9 @@ CREATE TABLE "Resource" (
     CONSTRAINT pk_resource                   PRIMARY KEY (resource_id),
     CONSTRAINT uq_resource_resource_image_id UNIQUE (resource_image_id),
     CONSTRAINT ck_resource_required_credits CHECK (required_credits BETWEEN 1 AND 20),
+    CONSTRAINT ck_resource_min_user_review_score CHECK (
+        min_user_review_score IS NULL OR min_user_review_score BETWEEN 1.00 AND 5.00
+    ),
     CONSTRAINT ck_resource_capacity         CHECK (capacity BETWEEN 1 AND 100),
 
     -- An owner with listed resources cannot be deleted; reassign or remove

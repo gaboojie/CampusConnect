@@ -84,6 +84,9 @@ export type ResourceDetails = {
   building: NamedOption & { address: string; latitude: number; longitude: number }
   capacity: number
   requiredCredits: number
+  minUserReviewScore: number | null
+  viewerReviewScore: number | null
+  viewerReviewCount: number
   maxReservationMinutes: number | null
   ownerUsername: string
   createdAt: string
@@ -104,6 +107,11 @@ export type ResourceDetails = {
     createdAt: string
     reviewerUsername: string | null
   }>
+}
+
+export type ResourceReviewWarning = {
+  minUserReviewScore: number
+  viewerReviewScore: number | null
 }
 
 export type ListingSummary = ResourceSummary & {

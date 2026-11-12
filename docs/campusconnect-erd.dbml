@@ -48,6 +48,7 @@ Table Resource {
   location_description text [not null]
   max_reservation_time interval
   required_credits integer [not null]
+  min_user_review_score decimal(3,2) [null]
   capacity integer [not null]
   created_at timestamp [not null]
   resource_image_id integer [null, unique]

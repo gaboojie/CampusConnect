@@ -3,7 +3,14 @@
   import { getJson, isAbortError, sendJson } from '../../lib/api'
   import { formatClock, formatDate, formatDateTime, formatDuration, formatRating } from '../../lib/format'
   import { routeHash } from '../../lib/routes'
-  import type { CreditSummary, PublicUser, ResourceDetails, ReservationWriteResponse, SlotInput } from '../../lib/types'
+  import type {
+    CreditSummary,
+    PublicUser,
+    ResourceDetails,
+    ResourceReviewWarning,
+    ReservationWriteResponse,
+    SlotInput,
+  } from '../../lib/types'
   import { suggestSlot } from '../../lib/calendar'
   import AvailabilityCalendar from '../AvailabilityCalendar.svelte'
   import ReservationForm from '../reservations/ReservationForm.svelte'
@@ -13,6 +20,7 @@
   export let backQuery: string
   export let user: PublicUser
   export let onUserUpdated: (user: PublicUser) => void
+  export let onResourceWarningChange: (warning: ResourceReviewWarning | null) => void
 
   let resource: ResourceDetails | null = null
   let loading = true
@@ -28,6 +36,14 @@
   $: void load(resourceId)
   $: cost = resource?.requiredCredits ?? 0
   $: affordable = user.creditBalance >= cost
+  $: reviewEligible = resource?.minUserReviewScore === null
+    || (resource?.viewerReviewScore !== null && resource?.viewerReviewScore !== undefined
+      && resource.viewerReviewScore >= resource.minUserReviewScore)
+  $: onResourceWarningChange(
+    resource && resource.minUserReviewScore !== null && !reviewEligible
+      ? { minUserReviewScore: resource.minUserReviewScore, viewerReviewScore: resource.viewerReviewScore }
+      : null,
+  )
 
   // The signed-in user object is loaded at login; read the current balance so
   // the cost check is not based on a stale value. Failures keep the old value.
@@ -48,6 +64,7 @@
     controller?.abort()
     const request = new AbortController()
     controller = request
+    resource = null
     loading = true
     error = ''
 
@@ -129,7 +146,7 @@
           </p>
 
           <div class="reserve-box">
-            <button type="button" on:click={() => { pickedSlot = null; pickedNote = ''; reserving = true }} disabled={!affordable}>Reserve</button>
+            <button type="button" on:click={() => { pickedSlot = null; pickedNote = ''; reserving = true }} disabled={!affordable || !reviewEligible}>Reserve</button>
             <p class="muted">
               Costs {credits(cost)} per booking · You have {credits(user.creditBalance)}.
               <a class="text-link" href="#/credits">My credits</a>
@@ -147,12 +164,12 @@
         {#key resource.id}
           <AvailabilityCalendar
             resourceId={resource.id}
-            onPickSlot={(slotResource, start, date) => {
+            onPickSlot={reviewEligible ? (slotResource, start, date) => {
               const suggestion = suggestSlot(slotResource, date, start)
               pickedSlot = suggestion.slot
               pickedNote = suggestion.note
               reserving = true
-            }}
+            } : undefined}
             onPickBooking={() => (window.location.hash = routeHash('reservations'))}
           />
         {/key}

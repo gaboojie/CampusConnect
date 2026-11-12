@@ -792,6 +792,42 @@ dd {
   padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 4vw, 3rem);
 }
 
+.resource-review-warning {
+  max-width: 1100px;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  margin: 0 auto 1.25rem;
+  border: 1px solid #b42318;
+  border-left-width: 5px;
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  color: #7a1f1f;
+  background: #fff0f0;
+  box-shadow: 0 4px 14px rgba(122, 31, 31, 0.1);
+}
+
+.resource-review-warning-icon {
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #b42318;
+  font-weight: 800;
+}
+
+.resource-review-warning strong {
+  font-weight: 800;
+}
+
+.resource-review-warning p {
+  margin: 0.25rem 0 0;
+  line-height: 1.45;
+}
+
 .map-app-main {
   display: flex;
   min-height: 0;
