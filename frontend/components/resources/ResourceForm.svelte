@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import type {
     AvailabilityRepeat,
     ListingDetails,
@@ -101,6 +102,14 @@
   let progress = 0;
   let imageUploadSelected = false;
   let formElement: HTMLFormElement;
+  type FormSection = "basic" | "booking" | "availability";
+  let basicOpen = true;
+  let bookingOpen = false;
+  let availabilityOpen = false;
+  let basicError = "";
+  let bookingError = "";
+  let availabilityError = "";
+  const errorOpenedSections = new Set<FormSection>();
 
   $: durationError = (() => {
     if (!hours && !minutes) return "";
@@ -113,12 +122,103 @@
     return "";
   })();
 
+  function clearSectionErrors() {
+    basicError = "";
+    bookingError = "";
+    availabilityError = "";
+  }
+
+  function setSectionError(section: FormSection, message: string) {
+    if (section === "basic") {
+      if (!basicOpen) errorOpenedSections.add(section);
+      basicOpen = true;
+      basicError = message;
+    } else if (section === "booking") {
+      if (!bookingOpen) errorOpenedSections.add(section);
+      bookingOpen = true;
+      bookingError = message;
+    } else {
+      if (!availabilityOpen) errorOpenedSections.add(section);
+      availabilityOpen = true;
+      availabilityError = message;
+    }
+  }
+
+  function handleSectionToggle(section: FormSection) {
+    if (errorOpenedSections.delete(section)) return;
+
+    if (section === "basic" && basicOpen) {
+      bookingOpen = false;
+      availabilityOpen = false;
+    } else if (section === "booking" && bookingOpen) {
+      basicOpen = false;
+      availabilityOpen = false;
+    } else if (section === "availability" && availabilityOpen) {
+      basicOpen = false;
+      bookingOpen = false;
+    }
+  }
+
+  function clearSectionError(section: FormSection) {
+    if (section === "basic") basicError = "";
+    else if (section === "booking") bookingError = "";
+    else availabilityError = "";
+  }
+
+  function sectionIsValid(section: FormSection): boolean {
+    const sectionElement = formElement?.querySelector<HTMLElement>(`[data-form-section="${section}"]`);
+    if (!sectionElement) return false;
+    return Array.from(sectionElement.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input, select, textarea"))
+      .every((control) => control.validity.valid);
+  }
+
+  function syncSectionError(section: FormSection) {
+    if (!sectionIsValid(section)) {
+      setSectionError(section, "Complete the highlighted fields.");
+    } else {
+      clearSectionError(section);
+    }
+  }
+
+  function sectionForError(message: string): FormSection | null {
+    const normalized = message.toLowerCase();
+    if (/(availability|repeat|maintenance|overlap|downtime)/.test(normalized)) return "availability";
+    if (/(credit|capacity|review score|feature|reservation time)/.test(normalized)) return "booking";
+    if (/(name|description|building|category|location|image|file)/.test(normalized)) return "basic";
+    return null;
+  }
+
+  function handleInvalid(event: Event) {
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    const section = target?.closest<HTMLElement>("[data-form-section]")?.dataset.formSection as FormSection | undefined;
+    if (section) setSectionError(section, "Complete the highlighted fields.");
+    error = "Please fix the highlighted fields before creating the resource.";
+  }
+
+  function handleInput(event: Event) {
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    const section = target?.closest<HTMLElement>("[data-form-section]")?.dataset.formSection as FormSection | undefined;
+    if (!section) {
+      error = "";
+      return;
+    }
+
+    if (!sectionIsValid(section)) {
+      setSectionError(section, "Complete the highlighted fields.");
+    } else if (!(section === "booking" && durationError)) {
+      clearSectionError(section);
+      if (!basicError && !bookingError && !availabilityError) error = "";
+    }
+  }
+
   async function submit(event: SubmitEvent) {
     event.preventDefault();
     if (submitting) return;
     error = "";
+    clearSectionErrors();
     if (durationError) {
       error = durationError;
+      setSectionError("booking", durationError);
       return;
     }
 
@@ -140,6 +240,8 @@
       });
     } catch (caught) {
       error = caught instanceof Error ? caught.message : "Unable to save this resource.";
+      const section = sectionForError(error);
+      if (section) setSectionError(section, error);
     } finally {
       submitting = false;
     }
@@ -156,6 +258,7 @@
   function removeAvailability(index: number) {
     if (availability.length <= 1) {
       error = "Keep at least one availability slot.";
+      setSectionError("availability", error);
       return;
     }
     availability = availability.filter((_slot, slotIndex) => slotIndex !== index);
@@ -176,6 +279,12 @@
   function removeFeature(index: number) {
     features = features.filter((_feature, featureIndex) => featureIndex !== index);
   }
+
+  onMount(() => {
+    syncSectionError("basic");
+    syncSectionError("booking");
+    syncSectionError("availability");
+  });
 </script>
 
 <div class="modal-layer">
@@ -189,99 +298,117 @@
       <button type="button" class="modal-close" aria-label="Close resource form" on:click={close} disabled={submitting}>×</button>
     </div>
 
-    <form bind:this={formElement} on:submit={submit} enctype="multipart/form-data" class="resource-form">
+    <form
+      bind:this={formElement}
+      on:submit={submit}
+      on:input={handleInput}
+      on:change={handleInput}
+      on:invalid|capture={handleInvalid}
+      enctype="multipart/form-data"
+      class="resource-form"
+    >
       {#if error}<div class="notice error-notice" role="alert">{error}</div>{/if}
 
-      <section class="form-section" aria-labelledby="resource-basics-title">
-        <div class="form-section-heading">
-          <div><h3 id="resource-basics-title">Basic information</h3><p class="muted">Give your resource a clear name and a short description.</p></div>
-          <span class="section-step">1</span>
-        </div>
-        <div class="form-grid two-up">
-          <label class="form-field-wide">Name<input name="name" bind:value={name} minlength="3" required disabled={submitting} /></label>
-          <label class="form-field-wide">Description<textarea name="description" bind:value={description} minlength="3" required disabled={submitting}></textarea></label>
-        </div>
-      </section>
-
-      <section class="form-section" aria-labelledby="resource-location-title">
-        <div class="form-section-heading">
-          <div><h3 id="resource-location-title">Location</h3><p class="muted">Tell people where to find this resource on campus.</p></div>
-          <span class="section-step">2</span>
-        </div>
-        <div class="form-grid two-up">
-          <label>Building<select name="buildingId" bind:value={buildingId} required disabled={submitting}><option value="" disabled>Select a building</option>{#each options.buildings as building (building.id)}<option value={String(building.id)}>{building.name}</option>{/each}</select></label>
-          <label>Category<select name="categoryId" bind:value={categoryId} required disabled={submitting}><option value="" disabled>Select a category</option>{#each options.categories as category (category.id)}<option value={String(category.id)}>{category.name}</option>{/each}</select></label>
-          <label class="form-field-wide">Location description<input name="locationDescription" bind:value={locationDescription} minlength="3" required disabled={submitting} /></label>
-        </div>
-      </section>
-
-      <section class="form-section" aria-labelledby="resource-booking-title">
-        <div class="form-section-heading">
-          <div><h3 id="resource-booking-title">Booking details</h3><p class="muted">Set reservation limits, capacity, and the required user review score.</p></div>
-          <span class="section-step">3</span>
-        </div>
-        <div class="form-grid two-up">
-          <label>Credits per booking<input name="requiredCredits" type="number" min="1" max="20" step="1" bind:value={requiredCredits} required disabled={submitting} /></label>
-          <label>Capacity<input name="capacity" type="number" min="1" max="100" step="1" bind:value={capacity} required disabled={submitting} /></label>
-          <label class="form-field-wide">Minimum user review score <span class="optional">(optional)</span><input name="minUserReviewScore" type="number" min="1" max="5" step="0.01" bind:value={minUserReviewScore} disabled={submitting} /><span class="form-help">Users must have this average received rating to reserve the resource.</span></label>
-        </div>
-        <fieldset class="duration-fields">
-          <legend>Maximum reservation time <span class="optional">(optional)</span></legend>
-          <p class="muted form-help">Leave both fields blank to allow reservations of any length.</p>
-          <div class="form-grid two-up">
-            <label>Hours<input name="maxReservationHours" type="number" min="0" step="1" bind:value={hours} disabled={submitting} /></label>
-            <label>Minutes<input name="maxReservationMinutes" type="number" min="0" max="59" step="1" bind:value={minutes} disabled={submitting} /></label>
+      <details class="form-section collapsible-form-section" data-form-section="basic" bind:open={basicOpen} on:toggle={() => handleSectionToggle("basic")}>
+        <summary class="form-section-heading">
+          <div class="section-summary-title"><span class="section-step">1</span><div><h3 id="resource-basics-title">Basic information</h3><p class="muted">Name, description, location, and resource image.</p></div></div>
+          <div class="section-summary-meta">
+            {#if basicError}<span class="section-step section-error-icon" role="img" aria-label="Basic information needs attention">!</span>{/if}
+            <span class="section-toggle-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg></span>
           </div>
-          {#if durationError}<p class="field-error">{durationError}</p>{/if}
-        </fieldset>
-      </section>
+        </summary>
+        <div class="form-grid two-up">
+          <label class="form-field-wide"><span class="field-label">Name <span class="required-marker" aria-hidden="true">*</span></span><input name="name" bind:value={name} minlength="3" required disabled={submitting} /></label>
+          <label class="form-field-wide"><span class="field-label">Description <span class="required-marker" aria-hidden="true">*</span></span><textarea name="description" bind:value={description} minlength="3" required disabled={submitting}></textarea></label>
+          <label><span class="field-label">Building <span class="required-marker" aria-hidden="true">*</span></span><select name="buildingId" bind:value={buildingId} required disabled={submitting}><option value="" disabled>Select a building</option>{#each options.buildings as building (building.id)}<option value={String(building.id)}>{building.name}</option>{/each}</select></label>
+          <label><span class="field-label">Category <span class="required-marker" aria-hidden="true">*</span></span><select name="categoryId" bind:value={categoryId} required disabled={submitting}><option value="" disabled>Select a category</option>{#each options.categories as category (category.id)}<option value={String(category.id)}>{category.name}</option>{/each}</select></label>
+          <label class="form-field-wide"><span class="field-label">Location description <span class="required-marker" aria-hidden="true">*</span></span><input name="locationDescription" bind:value={locationDescription} minlength="3" required disabled={submitting} /></label>
+          <label class="form-field-wide"><span class="field-label">Upload image <span class="optional">(Optional)</span></span><span class="form-help field-help">JPEG, PNG, or WebP files up to 1 MB.</span><input name="image" type="file" accept="image/jpeg,image/png,image/webp" disabled={submitting} /></label>
+          {#if initial?.images.length}<label class="checkbox-label form-field-wide"><input type="checkbox" bind:checked={removeImage} disabled={submitting} /> <span class="field-label">Remove current image <span class="optional">(Optional)</span></span></label>{/if}
+        </div>
+      </details>
 
-      <fieldset class="form-section">
-        <div class="form-section-heading"><div><h3>Resource features</h3><p class="muted">List useful equipment, amenities, or other details.</p></div><span class="section-step">4</span></div>
+      <details class="form-section collapsible-form-section booking-details" data-form-section="booking" bind:open={bookingOpen} on:toggle={() => handleSectionToggle("booking")}>
+        <summary class="form-section-heading">
+          <div class="section-summary-title"><span class="section-step">2</span><div><h3 id="resource-booking-title">Booking details</h3><p class="muted">Credits, capacity, review requirements, features, and booking length.</p></div></div>
+          <div class="section-summary-meta">
+            {#if bookingError}<span class="section-step section-error-icon" role="img" aria-label="Booking details need attention">!</span>{/if}
+            <span class="section-toggle-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg></span>
+          </div>
+        </summary>
+        <div class="form-grid two-up">
+          <label><span class="field-label">Credits per booking <span class="required-marker" aria-hidden="true">*</span></span><input name="requiredCredits" type="number" min="1" max="20" step="1" bind:value={requiredCredits} required disabled={submitting} /></label>
+          <label><span class="field-label">Capacity <span class="required-marker" aria-hidden="true">*</span></span><input name="capacity" type="number" min="1" max="100" step="1" bind:value={capacity} required disabled={submitting} /></label>
+        </div>
+        <div class="booking-options-grid">
+          <fieldset class="duration-fields">
+            <legend>Minimum user review score <span class="optional">(Optional)</span></legend>
+            <p class="muted form-help field-help">Users must have this average received rating to reserve the resource.</p>
+            <label><span class="field-label">Score <span class="optional">(Optional)</span></span><input name="minUserReviewScore" type="number" min="1" max="5" step="0.01" bind:value={minUserReviewScore} disabled={submitting} /></label>
+          </fieldset>
+          <fieldset class="duration-fields">
+            <legend>Maximum reservation time <span class="optional">(Optional)</span></legend>
+            <p class="muted form-help">Leave both fields blank to allow reservations of any length.</p>
+            <div class="form-grid two-up">
+              <label><span class="field-label">Hours <span class="optional">(Optional)</span></span><input name="maxReservationHours" type="number" min="0" step="1" bind:value={hours} disabled={submitting} /></label>
+              <label><span class="field-label">Minutes <span class="optional">(Optional)</span></span><input name="maxReservationMinutes" type="number" min="0" max="59" step="1" bind:value={minutes} disabled={submitting} /></label>
+            </div>
+            {#if durationError}<p class="field-error">{durationError}</p>{/if}
+          </fieldset>
+        </div>
+        <fieldset class="nested-form-section">
+          <legend>Resource features <span class="optional">(Optional)</span></legend>
+          <p class="muted">List useful equipment, amenities, or other details.</p>
         {#each features as feature, index (index)}
-          <div class="form-section-heading"><strong>Feature {index + 1}</strong><button type="button" class="secondary-button" on:click={() => removeFeature(index)} disabled={submitting}>Remove</button></div>
-          <label>Feature name<input type="text" bind:value={feature.name} minlength="2" maxlength="100" required placeholder="e.g., Scoreboard access" disabled={submitting} /></label>
-          <label>Description<textarea bind:value={feature.description} minlength="2" maxlength="500" required rows="2" placeholder="Describe this feature..." disabled={submitting}></textarea></label>
+            <div class="form-section-heading"><strong>Feature {index + 1}</strong><button type="button" class="secondary-button" on:click={() => removeFeature(index)} disabled={submitting}>Remove</button></div>
+            <label><span class="field-label">Feature name <span class="required-marker" aria-hidden="true">*</span></span><input type="text" bind:value={feature.name} minlength="2" maxlength="100" required placeholder="e.g., Scoreboard access" disabled={submitting} /></label>
+            <label><span class="field-label">Description <span class="required-marker" aria-hidden="true">*</span></span><textarea bind:value={feature.description} minlength="2" maxlength="500" required rows="2" placeholder="Describe this feature..." disabled={submitting}></textarea></label>
         {/each}
-        <button type="button" class="secondary-button" on:click={addFeature} disabled={submitting || features.length >= 30}>+ Add feature</button>
-      </fieldset>
+          <button type="button" class="secondary-button" on:click={addFeature} disabled={submitting || features.length >= 30}>+ Add feature</button>
+        </fieldset>
+      </details>
 
-      <fieldset class="form-section availability-fields">
-        <div class="form-section-heading"><div><h3>Maintenance periods</h3><p class="muted">Schedule downtime windows for this resource if needed.</p></div><span class="section-step">5</span></div>
-        {#each maintenancePeriods as period, index (index)}
-          <div class="form-section-heading"><strong>Maintenance window {index + 1}</strong><button type="button" class="secondary-button" on:click={() => removeMaintenancePeriod(index)} disabled={submitting}>Remove</button></div>
-          <div class="form-grid two-up">
-            <label>Maintenance starts<input type="datetime-local" bind:value={period.startTime} required disabled={submitting} /></label>
-            <label>Maintenance ends<input type="datetime-local" bind:value={period.endTime} min={period.startTime} required disabled={submitting} /></label>
+      <details class="form-section collapsible-form-section" data-form-section="availability" bind:open={availabilityOpen} on:toggle={() => handleSectionToggle("availability")}>
+        <summary class="form-section-heading">
+          <div class="section-summary-title"><span class="section-step">3</span><div><h3 id="resource-availability-title">Availability logic</h3><p class="muted">Set reservable windows and maintenance downtime.</p></div></div>
+          <div class="section-summary-meta">
+            {#if availabilityError}<span class="section-step section-error-icon" role="img" aria-label="Availability logic needs attention">!</span>{/if}
+            <span class="section-toggle-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg></span>
           </div>
-          <label>Reason<input type="text" bind:value={period.reason} minlength="3" maxlength="500" required placeholder="e.g., Scheduled equipment repair" disabled={submitting} /></label>
-        {/each}
-        <button type="button" class="secondary-button" on:click={addMaintenancePeriod} disabled={submitting || maintenancePeriods.length >= 20}>+ Add maintenance period</button>
-      </fieldset>
-
-      <fieldset class="form-section availability-fields" aria-labelledby="resource-availability-title">
-        <div class="form-section-heading"><div><h3 id="resource-availability-title">Availability</h3><p class="muted">Choose when this resource can be reserved. Times use Virginia Tech campus time.</p></div><span class="section-step">6</span></div>
-        {#each availability as slot, index (slot.id ?? `new-${index}`)}
-          <div class="availability-slot">
-            <div class="availability-slot-heading"><strong>Availability {index + 1}</strong><button type="button" class="secondary-button compact-button" on:click={() => removeAvailability(index)} disabled={submitting || availability.length <= 1}>Remove</button></div>
-            <div class="form-grid two-up">
-              <label>Starts<input type="datetime-local" bind:value={slot.startTime} required disabled={submitting} /></label>
-              <label>Ends<input type="datetime-local" min={slot.startTime} bind:value={slot.endTime} required disabled={submitting} /></label>
+        </summary>
+        <fieldset class="nested-form-section availability-fields" aria-labelledby="resource-availability-title">
+          <legend>Availability schedule <span class="required-marker" aria-hidden="true">*</span></legend>
+          <p class="muted">Choose when this resource can be reserved. Times use Virginia Tech campus time.</p>
+          {#each availability as slot, index (slot.id ?? `new-${index}`)}
+            <div class="availability-slot">
+              <div class="availability-slot-heading"><strong>Availability {index + 1}</strong><button type="button" class="secondary-button compact-button" on:click={() => removeAvailability(index)} disabled={submitting || availability.length <= 1}>Remove</button></div>
+              <div class="form-grid two-up">
+                <label><span class="field-label">Starts <span class="required-marker" aria-hidden="true">*</span></span><input type="datetime-local" bind:value={slot.startTime} required disabled={submitting} /></label>
+                <label><span class="field-label">Ends <span class="required-marker" aria-hidden="true">*</span></span><input type="datetime-local" min={slot.startTime} bind:value={slot.endTime} required disabled={submitting} /></label>
+              </div>
+              <div class="form-grid two-up">
+                <label><span class="field-label">Repeats</span><select bind:value={slot.repeat} disabled={submitting}>{#each repeatOptions as option}<option value={option.value}>{option.label}</option>{/each}</select></label>
+                {#if slot.repeat !== "none"}<label><span class="field-label">Repeats until <span class="required-marker" aria-hidden="true">*</span></span><input type="datetime-local" min={slot.endTime} bind:value={slot.repeatsUntil} required disabled={submitting} /></label>{/if}
+              </div>
             </div>
-            <div class="form-grid two-up">
-              <label>Repeats<select bind:value={slot.repeat} disabled={submitting}>{#each repeatOptions as option}<option value={option.value}>{option.label}</option>{/each}</select></label>
-              {#if slot.repeat !== "none"}<label>Repeats until<input type="datetime-local" min={slot.endTime} bind:value={slot.repeatsUntil} required disabled={submitting} /></label>{/if}
-            </div>
-          </div>
-        {/each}
-        <button type="button" class="secondary-button add-availability-button" on:click={addAvailability} disabled={submitting}>+ Add availability slot</button>
-      </fieldset>
+          {/each}
+          <button type="button" class="secondary-button add-availability-button" on:click={addAvailability} disabled={submitting}>+ Add availability slot</button>
+        </fieldset>
 
-      <section class="form-section" aria-labelledby="resource-image-title">
-        <div class="form-section-heading"><div><h3 id="resource-image-title">Resource image</h3><p class="muted">Add an optional JPEG, PNG, or WebP image up to 1 MB.</p></div><span class="section-step">7</span></div>
-        <label>Upload image <span class="optional">(optional)</span><input name="image" type="file" accept="image/jpeg,image/png,image/webp" disabled={submitting} /></label>
-        {#if initial?.images.length}<label class="checkbox-label"><input type="checkbox" bind:checked={removeImage} disabled={submitting} /> Remove current image</label>{/if}
-      </section>
+        <fieldset class="nested-form-section">
+          <legend>Maintenance periods <span class="optional">(Optional)</span></legend>
+          <p class="muted">Schedule downtime windows for this resource if needed.</p>
+          {#each maintenancePeriods as period, index (index)}
+            <div class="form-section-heading"><strong>Maintenance window {index + 1}</strong><button type="button" class="secondary-button" on:click={() => removeMaintenancePeriod(index)} disabled={submitting}>Remove</button></div>
+            <div class="form-grid two-up">
+              <label><span class="field-label">Maintenance starts <span class="required-marker" aria-hidden="true">*</span></span><input type="datetime-local" bind:value={period.startTime} required disabled={submitting} /></label>
+              <label><span class="field-label">Maintenance ends <span class="required-marker" aria-hidden="true">*</span></span><input type="datetime-local" bind:value={period.endTime} min={period.startTime} required disabled={submitting} /></label>
+            </div>
+            <label><span class="field-label">Reason <span class="required-marker" aria-hidden="true">*</span></span><input type="text" bind:value={period.reason} minlength="3" maxlength="500" required placeholder="e.g., Scheduled equipment repair" disabled={submitting} /></label>
+          {/each}
+          <button type="button" class="secondary-button" on:click={addMaintenancePeriod} disabled={submitting || maintenancePeriods.length >= 20}>+ Add maintenance period</button>
+        </fieldset>
+      </details>
 
       {#if submitting && imageUploadSelected && progress > 0}<div class="upload-progress" aria-live="polite"><div class="upload-progress-bar" style={`width: ${progress}%`}></div><span>Uploading image… {progress}%</span></div>{/if}
       <div class="form-actions"><button type="button" class="secondary-button" on:click={close} disabled={submitting}>Cancel</button><button type="submit" disabled={submitting}>{submitting ? "Saving…" : submitLabel}</button></div>

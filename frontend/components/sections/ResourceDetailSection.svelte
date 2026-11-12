@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte'
   import { getJson, isAbortError, sendJson } from '../../lib/api'
-  import { formatClock, formatDate, formatDateTime, formatDuration, formatRating } from '../../lib/format'
+  import { formatDate, formatDateTime, formatDuration, formatRating } from '../../lib/format'
   import { routeHash } from '../../lib/routes'
   import type {
     CreditSummary,
@@ -158,23 +158,6 @@
         </div>
       </div>
 
-      <section class="detail-block detail-availability">
-        <h3>Availability</h3>
-        <p class="muted">Green slots are open. Click one to reserve it. Red slots are booked, and blue slots are yours.</p>
-        {#key resource.id}
-          <AvailabilityCalendar
-            resourceId={resource.id}
-            onPickSlot={reviewEligible ? (slotResource, start, date) => {
-              const suggestion = suggestSlot(slotResource, date, start)
-              pickedSlot = suggestion.slot
-              pickedNote = suggestion.note
-              reserving = true
-            } : undefined}
-            onPickBooking={() => (window.location.hash = routeHash('reservations'))}
-          />
-        {/key}
-      </section>
-
       <div class="detail-info-grid">
         <section class="detail-block detail-block-wide">
           <h3>Description</h3>
@@ -227,24 +210,20 @@
           {/if}
         </section>
 
-        <section class="detail-block">
-          <h3>Hours this week</h3>
-          <table class="hours-table">
-            <tbody>
-              {#each resource.weeklyHours as day (day.date)}
-                <tr>
-                  <th scope="row">{day.weekday} <span class="muted">{formatDate(day.date)}</span></th>
-                  <td>
-                    {#if day.windows.length === 0}
-                      <span class="muted">Closed</span>
-                    {:else}
-                      {day.windows.map((slot) => slot.allDay ? 'Open all day' : `${formatClock(slot.opensAt)} – ${formatClock(slot.closesAt)}`).join(', ')}
-                    {/if}
-                  </td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
+        <section class="detail-block detail-availability">
+          <h3>Availability</h3>
+          {#key resource.id}
+            <AvailabilityCalendar
+              resourceId={resource.id}
+              onPickSlot={reviewEligible ? (slotResource, start, date) => {
+                const suggestion = suggestSlot(slotResource, date, start)
+                pickedSlot = suggestion.slot
+                pickedNote = suggestion.note
+                reserving = true
+              } : undefined}
+              onPickBooking={() => (window.location.hash = routeHash('reservations'))}
+            />
+          {/key}
         </section>
       </div>
 
