@@ -123,12 +123,9 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
 ## Migrations and environment variables
 
 - `db/migrations/` holds one ordered set of SQL files shared by every environment. `--environment dev|prod` only chooses which database the runner connects to.
-- `001_schema.sql` creates the complete schema and `002_seed.sql` inserts the synthetic grading/demo data.
-- `003_notification_read.sql` adds `"Notification".read_at`, which tracks read state for the in-app notifications dropdown.
-- `004_login_lockout.sql` adds `"User".failed_login_attempts` and `"User".locked_until`, which power the five-attempt sign-in lockout.
-- `005_review_schema_backfill.sql` renames `ReservationReview` to `UserReview`, adds the required `ResourceReview.reservation_id` relationship, and backfills existing resource reviews.
-- `006_review_notifications.sql` adds the idempotency index used by the review-notification sweep.
-- `003` through `006` are additive and safe to re-run. An existing database picks them up by running the migrate command, with no reset needed. Run them on Neon `dev` first, then on `main` after review.
+- `001_schema.sql` is the single source of truth for the complete database schema, including notification read state, login lockout, review relationships, and review-notification idempotency.
+- `002_seed.sql` inserts the synthetic grading/demo data after the schema is created.
+- Because the schema is intentionally centralized, schema changes require updating `001_schema.sql` and recreating the target database; there are no additive schema migrations.
 - `db/scripts/migrate.ts` applies files in order and records applied versions in `schema_migrations`, so already-applied files are skipped.
 - `npm run migrate:dev` and `npm run migrate:prod` automatically use `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` from `.env.dev` or `.env.prod`, respectively. For example:
 

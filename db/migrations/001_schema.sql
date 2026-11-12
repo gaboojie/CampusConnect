@@ -52,6 +52,8 @@ CREATE TABLE "User" (
     email                   varchar(254)  NOT NULL,
     password_hash           text,
     email_verified_at       timestamp,
+    failed_login_attempts   integer       NOT NULL DEFAULT 0,
+    locked_until            timestamptz,
     role                    varchar       NOT NULL DEFAULT 'student',
     created_at              timestamp     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     credit_balance          integer       NOT NULL,
@@ -283,6 +285,7 @@ CREATE TABLE "Notification" (
     message            text       NOT NULL,
     notification_type  varchar    NOT NULL,
     created_at         timestamp  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    read_at            timestamp,
     scheduled_for      timestamp,
     email_status       varchar,
     email_workflow_id  varchar(100),
@@ -309,6 +312,11 @@ CREATE TABLE "Notification" (
 CREATE INDEX idx_notification_email_pending
     ON "Notification" (scheduled_for)
     WHERE email_status = 'pending';
+
+-- Speeds up the unread badge and the "Unread" filter for a user.
+CREATE INDEX idx_notification_user_unread
+    ON "Notification" (user_id)
+    WHERE read_at IS NULL;
 
 -- -----------------------------------------------------------------------------
 -- UserReview: weak entity; PK is also the FK to its reservation
@@ -386,4 +394,10 @@ CREATE TABLE "Session" (
         FOREIGN KEY (user_id) REFERENCES "User" (user_id)
         ON UPDATE CASCADE ON DELETE CASCADE
 );
+
+-- Review-due notifications are unique per recipient, reservation, and type.
+-- Reminder and cancellation notification history remains unrestricted.
+CREATE UNIQUE INDEX uq_review_notification_reservation_type_user
+    ON "Notification" (user_id, reservation_id, notification_type)
+    WHERE notification_type IN ('resource_review_due', 'user_review_due');
 

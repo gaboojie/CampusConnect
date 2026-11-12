@@ -19,12 +19,11 @@ The canonical migration set is:
 ```text
 db/migrations/001_schema.sql
 db/migrations/002_seed.sql
-db/migrations/003_notification_read.sql
-db/migrations/004_login_lockout.sql
-db/migrations/005_review_schema_backfill.sql
 ```
 
-`003`, `004`, and `005` are additive and safe to re-run, so an existing database is brought up to date with `npm run migrate:dev` or `npm run migrate:prod` and does not need a reset.
+`001_schema.sql` is the complete database schema, including notification read state, login lockout, review relationships, and review-notification idempotency. `002_seed.sql` inserts synthetic grading/demo data.
+
+Schema changes are intentionally centralized in `001_schema.sql`; there are no additive schema migrations. Recreate the target database when applying a changed schema.
 
 Development and production use the same ordered migration files. The `--environment dev|prod` option selects the corresponding connection configuration and does not select a different SQL copy.
 
@@ -60,4 +59,4 @@ Credit logic lives in `db/repositories/credits.ts` and uses only the existing `"
 - `npm run check` validates the frontend and Vite configuration.
 - `npm run typecheck` validates backend, database, and test TypeScript.
 
-`README.md` is intentionally unchanged. Its historical path descriptions may refer to the pre-refactor layout; this document is the current structure reference.
+`README.md` is the operational setup guide; this document is the current structure reference.
