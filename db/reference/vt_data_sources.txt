@@ -158,11 +158,10 @@ The Phase 3 documentation defines credit columns but no credit, refund, or
 cancellation policy. seed.sql uses these ASSUMED rules:
 
   a. New account: +20 credits (transaction_type 'initial_grant').
-  b. Monthly reset on the 1st at 00:00: the balance returns to 20 and
-     unused credits do not roll over. A 'monthly_reset' row stores the
-     top-up amount and is only written when the balance changes;
-     credit_last_reset is still updated. Suspended accounts do not
-     receive resets.
+  b. Every 30 days since the last credit grant, active accounts receive an
+     additive 20-credit 'monthly_reset'. Existing credits are not discarded
+     or capped at 20. Suspended accounts do not receive resets. If the daily
+     sweep is late, it catches up every completed 30-day period.
   c. Booking deducts the resource's required_credits once, as a flat
      charge per reservation, not per hour ('reservation_charge').
   d. A user who cancels at least 24 hours before the start gets a full

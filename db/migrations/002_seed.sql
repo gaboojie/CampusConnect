@@ -19,9 +19,9 @@
 --
 -- Credit rules used (assumptions; not defined in the Phase 3 documents):
 --   * New accounts receive 20 credits ('initial_grant').
---   * On the 1st of each month the balance is reset to 20; unused credits do
---     not roll over. A 'monthly_reset' row records the top-up amount and is
---     only written when the balance changes.
+--   * Active accounts receive an additive 20-credit 'monthly_reset' for every
+--     completed 30-day period since their last credit grant. Historical seed
+--     rows below preserve the original snapshot and are not rewritten.
 --   * Booking deducts the resource's required_credits once ('reservation_charge').
 --   * Cancelling >= 24 hours before the start is fully refunded ('refund');
 --     later cancellations and no-shows are not refunded.

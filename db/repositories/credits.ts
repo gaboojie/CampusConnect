@@ -2,6 +2,9 @@ import type { DatabaseClient } from "../client";
 import { CAMPUS_NOW_SQL, localTimestampSql, type Validation } from "./resources";
 
 // Credit rules (from the documented seed-data rules in 002_seed.sql):
+//   * New accounts receive 20 credits as an initial grant.
+//   * Active accounts receive an additive 20-credit monthly_reset for every
+//     completed 30-day period since their last credit grant.
 //   * Each successful booking deducts the resource's required_credits once.
 //   * Cancelling at least 24 hours before the start is fully refunded; later
 //     cancellations and no-shows are not refunded.
@@ -9,6 +12,8 @@ import { CAMPUS_NOW_SQL, localTimestampSql, type Validation } from "./resources"
 //   * Rescheduling does not change the charge.
 export const REFUND_NOTICE_HOURS = 24;
 export const REFUND_WINDOW_SQL = `interval '${REFUND_NOTICE_HOURS} hours'`;
+export const MONTHLY_CREDIT_GRANT = 20;
+export const MONTHLY_CREDIT_INTERVAL_DAYS = 30;
 
 export const CREDIT_TRANSACTION_TYPES = [
   "initial_grant",
@@ -205,6 +210,85 @@ export async function refundCredits(
     throw new Error(`Credit refund for user ${input.userId} was not recorded.`);
   }
   return balance;
+}
+
+export type MonthlyCreditResetResult = {
+  usersProcessed: number;
+  periodsGranted: number;
+  creditsGranted: number;
+};
+
+type MonthlyCreditDueRow = {
+  user_id: number;
+  periods_due: number;
+};
+
+export const FIND_DUE_MONTHLY_CREDITS_SQL = `
+  SELECT
+    user_id,
+    (((${CAMPUS_NOW_SQL})::date - credit_last_reset) / $1::integer)::integer AS periods_due
+  FROM "User"
+  WHERE is_banned = FALSE
+    AND is_account_deleted = FALSE
+    AND ((${CAMPUS_NOW_SQL})::date - credit_last_reset) >= $1::integer
+  ORDER BY user_id
+  FOR UPDATE
+`;
+
+export const APPLY_MONTHLY_CREDITS_SQL = `
+  UPDATE "User"
+  SET
+    credit_balance = credit_balance + $2::integer,
+    credit_last_reset = credit_last_reset + $3::integer
+  WHERE user_id = $1
+`;
+
+export const INSERT_MONTHLY_CREDIT_TRANSACTIONS_SQL = `
+  INSERT INTO "CreditTransaction" (user_id, amount, transaction_type, created_at)
+  SELECT $1, $2::integer, 'monthly_reset', ${CAMPUS_NOW_SQL}
+  FROM generate_series(1, $3::integer)
+`;
+
+// Grants every completed 30-day period since credit_last_reset. The caller is
+// the daily cron, but the row locks and transaction make repeated/concurrent
+// sweeps idempotent for a given period.
+export async function applyMonthlyCreditResets(
+  client: DatabaseClient,
+): Promise<MonthlyCreditResetResult> {
+  await client.query("BEGIN");
+
+  try {
+    const due = await client.query<MonthlyCreditDueRow>(FIND_DUE_MONTHLY_CREDITS_SQL, [
+      MONTHLY_CREDIT_INTERVAL_DAYS,
+    ]);
+    let periodsGranted = 0;
+
+    for (const row of due.rows) {
+      const periods = Math.max(0, Number(row.periods_due));
+      if (periods === 0) continue;
+
+      const credits = periods * MONTHLY_CREDIT_GRANT;
+      const days = periods * MONTHLY_CREDIT_INTERVAL_DAYS;
+
+      await client.query(APPLY_MONTHLY_CREDITS_SQL, [row.user_id, credits, days]);
+      await client.query(INSERT_MONTHLY_CREDIT_TRANSACTIONS_SQL, [
+        row.user_id,
+        MONTHLY_CREDIT_GRANT,
+        periods,
+      ]);
+      periodsGranted += periods;
+    }
+
+    await client.query("COMMIT");
+    return {
+      usersProcessed: due.rows.filter((row) => Number(row.periods_due) > 0).length,
+      periodsGranted,
+      creditsGranted: periodsGranted * MONTHLY_CREDIT_GRANT,
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  }
 }
 
 export type RefundStatus = "refunded" | "late" | "not_charged" | "unverified";

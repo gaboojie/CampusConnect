@@ -104,6 +104,7 @@ import {
   type ServiceResult,
 } from "../db/repositories/reservations";
 import {
+  applyMonthlyCreditResets,
   getCreditSummary,
   listCreditTransactions,
   parseCreditTransactionQuery,
@@ -1663,7 +1664,40 @@ export function createApp(options: AppOptions = {}) {
   return app;
 }
 
-async function scheduled(controller: ScheduledController, env: Bindings): Promise<void> {
+export async function runMonthlyCreditSweep(
+  env: Pick<Bindings, "DB">,
+  createDatabaseClient: DatabaseClientFactory = defaultDatabaseClientFactory,
+): Promise<Awaited<ReturnType<typeof applyMonthlyCreditResets>>> {
+  if (!env.DB) {
+    throw new Error("Database is not configured.");
+  }
+
+  return withDatabase(
+    env.DB.connectionString,
+    createDatabaseClient,
+    (client) => applyMonthlyCreditResets(client),
+  );
+}
+
+export async function scheduled(
+  controller: ScheduledController,
+  env: Bindings,
+  createDatabaseClient: DatabaseClientFactory = defaultDatabaseClientFactory,
+): Promise<void> {
+  if (controller.cron === "0 6 * * *") {
+    try {
+      const result = await runMonthlyCreditSweep(env, createDatabaseClient);
+      console.info(
+        `Monthly credit sweep completed: ${result.usersProcessed} user(s), ` +
+          `${result.periodsGranted} period(s), ${result.creditsGranted} credit(s).`,
+      );
+    } catch (error) {
+      console.error(`Monthly credit sweep failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
+    return;
+  }
+
   if (controller.cron !== "*/15 * * * *") return;
 
   try {

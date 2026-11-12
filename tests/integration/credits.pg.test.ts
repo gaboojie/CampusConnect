@@ -8,6 +8,7 @@ import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { DatabaseClient } from "../../db/client";
 import {
+  applyMonthlyCreditResets,
   findReservationCharge,
   getCreditSummary,
   listCreditTransactions,
@@ -113,6 +114,24 @@ async function countCredits(userId: number, type: string): Promise<number> {
   return result.rows[0].count;
 }
 
+async function setResetAnchor(userId: number, daysAgo: number): Promise<void> {
+  await admin.query(
+    `UPDATE "User"
+     SET credit_last_reset = (now() AT TIME ZONE 'America/New_York')::date - $2::integer
+     WHERE user_id = $1`,
+    [userId, daysAgo],
+  );
+}
+
+async function isolateMonthlySweep(userIds: number[]): Promise<void> {
+  await admin.query(
+    `UPDATE "User"
+     SET credit_last_reset = (now() AT TIME ZONE 'America/New_York')::date
+     WHERE NOT (user_id = ANY($1::integer[]))`,
+    [userIds],
+  );
+}
+
 async function historyTotal(userId: number): Promise<number> {
   const result = await admin.query<{ total: number }>(
     `SELECT COALESCE(SUM(amount), 0)::integer AS total FROM "CreditTransaction" WHERE user_id = $1`,
@@ -184,6 +203,56 @@ describe.skipIf(!url)("credits against real PostgreSQL", () => {
       { table_name: "CreditTransaction", data_type: "timestamp without time zone" },
       { table_name: "Reservation", data_type: "timestamp without time zone" },
     ]);
+  });
+
+  it("adds 20 credits per completed period and is idempotent", async () => {
+    const userId = await createUser(7);
+    await isolateMonthlySweep([userId]);
+    await setResetAnchor(userId, 90);
+
+    const first = await applyMonthlyCreditResets(admin);
+    expect(first).toMatchObject({ usersProcessed: 1, periodsGranted: 3, creditsGranted: 60 });
+    expect(await balanceOf(userId)).toBe(67);
+    expect(await countCredits(userId, "monthly_reset")).toBe(3);
+    expect(await balanceOf(userId)).toBe(await historyTotal(userId));
+
+    const second = await applyMonthlyCreditResets(admin);
+    expect(second).toEqual({ usersProcessed: 0, periodsGranted: 0, creditsGranted: 0 });
+    expect(await balanceOf(userId)).toBe(67);
+    expect(await countCredits(userId, "monthly_reset")).toBe(3);
+  });
+
+  it("does not grant banned or deleted accounts", async () => {
+    const banned = await createUser(7);
+    const deleted = await createUser(7);
+    await isolateMonthlySweep([banned, deleted]);
+    await setResetAnchor(banned, 30);
+    await setResetAnchor(deleted, 30);
+    await admin.query(`UPDATE "User" SET is_banned = TRUE WHERE user_id = $1`, [banned]);
+    await admin.query(`UPDATE "User" SET is_account_deleted = TRUE WHERE user_id = $1`, [deleted]);
+
+    const result = await applyMonthlyCreditResets(admin);
+    expect(result.usersProcessed).toBe(0);
+    expect(await balanceOf(banned)).toBe(7);
+    expect(await balanceOf(deleted)).toBe(7);
+    expect(await countCredits(banned, "monthly_reset")).toBe(0);
+    expect(await countCredits(deleted, "monthly_reset")).toBe(0);
+  });
+
+  it("does not double-credit when two sweeps run concurrently", async () => {
+    const userId = await createUser(7);
+    await isolateMonthlySweep([userId]);
+    await setResetAnchor(userId, 60);
+
+    const results = await Promise.all([
+      applyMonthlyCreditResets(await connect()),
+      applyMonthlyCreditResets(await connect()),
+    ]);
+
+    expect(results.reduce((total, result) => total + result.periodsGranted, 0)).toBe(2);
+    expect(await balanceOf(userId)).toBe(47);
+    expect(await countCredits(userId, "monthly_reset")).toBe(2);
+    expect(await balanceOf(userId)).toBe(await historyTotal(userId));
   });
 
   it("writes the reservation and its charge with the identical campus-time timestamp", async () => {
