@@ -192,6 +192,10 @@
               <dd>{resource.maxReservationMinutes ? formatDuration(resource.maxReservationMinutes) : 'No limit'}</dd>
             </div>
             <div><dt>Listed by</dt><dd>{resource.ownerUsername}</dd></div>
+            <div>
+              <dt>Minimum user review score</dt>
+              <dd>{resource.minUserReviewScore === null ? 'No minimum' : `${resource.minUserReviewScore.toFixed(2)} / 5.00`}</dd>
+            </div>
           </dl>
         </section>
       </div>

@@ -199,6 +199,7 @@
             <div><dt>Credits per booking</dt><dd>{listing.requiredCredits}</dd></div>
             <div><dt>Longest booking</dt><dd>{listing.maxReservationMinutes ? formatDuration(listing.maxReservationMinutes) : 'No limit'}</dd></div>
             <div><dt>Listed by</dt><dd>{user.username}</dd></div>
+            <div><dt>Minimum user review score</dt><dd>{listing.minUserReviewScore === null ? 'No minimum' : `${listing.minUserReviewScore.toFixed(2)} / 5.00`}</dd></div>
           </dl>
         </section>
 
