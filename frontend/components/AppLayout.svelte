@@ -11,6 +11,7 @@
   import CreditsSection from './sections/CreditsSection.svelte'
   import ListingsSection from './sections/ListingsSection.svelte'
   import ListingDetailSection from './sections/ListingDetailSection.svelte'
+  import MapsSection from './sections/MapsSection.svelte'
   import PlaceholderSection from './sections/PlaceholderSection.svelte'
   import ProfileSection from './sections/ProfileSection.svelte'
   import ReservationsSection from './sections/ReservationsSection.svelte'
@@ -100,7 +101,7 @@
     <button type="button" class="drawer-backdrop" aria-label="Close navigation" on:click={closeDrawer}></button>
   {/if}
 
-  <div class="app-main">
+  <div class="app-main" class:map-app-main={route.id === 'maps'}>
     <div class="mobile-bar">
       <button
         type="button"
@@ -137,6 +138,8 @@
       <ResourceDetailSection resourceId={location.subpath} backQuery={location.query} {user} {onUserUpdated} />
     {:else if route.id === 'resources'}
       <ResourcesSection query={location.query} />
+    {:else if route.id === 'maps'}
+      <MapsSection />
     {:else if route.id === 'listings' && location.subpath}
       <ListingDetailSection listingId={location.subpath} {user} />
     {:else if route.id === 'listings'}

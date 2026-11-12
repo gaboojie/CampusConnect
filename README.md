@@ -13,6 +13,7 @@ _Authors: Faria Binta Awal, Ashwaq Alaklabi, Rokeshuvaraj Nagarajan, & Gabriel J
 - **Listings:** members who may add resources can create and manage their own listings, including images stored in Cloudflare R2.
 - **Notifications:** email reminders and cancellation notices are sent through Cloudflare Workflows. The bell in the top bar opens an in-app dropdown with an unread count, per-item and bulk "mark as read", and an All/Unread filter.
 - **Announcements:** current maintenance notices and newly listed resources.
+- **Maps:** an interactive Google Maps view of Virginia Tech's Blacksburg campus, centered on the Drillfield.
 - **Admin panel** (`/admin`, admins only):
   - Overview with charts of activity, reservation status, and user roles.
   - Users: create, edit, ban or unban, promote or demote, and delete accounts.
@@ -146,6 +147,9 @@ https://campusconnect-production.vt-campusconnect.workers.dev/
 - `.env.dev` and `.env.prod` are ignored and must never be committed.
 - `.env.dev.example` documents local Worker values.
 - `.env.prod.example` documents the migration-only `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB`.
+- `GOOGLE_MAPS_JAVASCRIPT_API_KEY` is an optional Worker secret used by the authenticated Maps tab. Add it to `.env.dev` for local development. For production, create a restricted Maps JavaScript API key and run `npx wrangler secret put GOOGLE_MAPS_JAVASCRIPT_API_KEY --env production`.
+- `GOOGLE_MAPS_MAP_ID` is a public map configuration value declared in `wrangler.jsonc`. Replace `DEMO_MAP_ID` with a production JavaScript Map ID before adding Advanced Markers.
+- `GOOGLE_PLACES_API_KEY` is a server-only Worker secret used only after a user selects a CampusConnect building with a stored Google Place ID. Restrict it to Places API (New), add it to `.env.dev` for local development, and configure production with `npx wrangler secret put GOOGLE_PLACES_API_KEY --env production`. It is never returned to the browser.
 - `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are server-only Worker secrets and must be configured separately for dev and production. Do not share or commit them.
 - `wrangler.jsonc` contains non-secret environment values, R2 bucket names, Hyperdrive IDs, and Worker settings.
 

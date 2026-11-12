@@ -123,14 +123,14 @@ INSERT INTO "EmailVerificationToken" (user_id, token_hash, created_at, used_at) 
 
 -- -----------------------------------------------------------------------------
 -- Building (names, addresses, coordinates from official vt.edu building pages)
--- google_place_id is NULL: no Place ID was verified.
+-- google_place_id values were verified manually through Google Places.
 -- -----------------------------------------------------------------------------
 INSERT INTO "Building" (building_id, building_name, address, latitude, longitude, google_place_id) VALUES
-    (1, 'Carol M. Newman Library', '560 Drillfield Drive, Blacksburg, VA 24061', '37.228760', '-80.419240', NULL),
-    (2, 'Torgersen Hall', '620 Drillfield Drive, Blacksburg, VA 24061', '37.229780', '-80.419970', NULL),
-    (3, 'McComas Hall', '895 Washington St. SW, Blacksburg, VA 24061', '37.220690', '-80.422300', NULL),
-    (4, 'War Memorial Hall', '370 Drillfield Drive, Blacksburg, VA 24061', '37.226290', '-80.420590', NULL),
-    (5, 'Squires Student Center', '290 College Ave., Blacksburg, VA 24061', '37.229620', '-80.417960', NULL);
+    (1, 'Carol M. Newman Library', '560 Drillfield Drive, Blacksburg, VA 24061', '37.228760', '-80.419240', 'ChIJf8z4LA2VTYgRiVKpkwVghp8'),
+    (2, 'Torgersen Hall', '620 Drillfield Drive, Blacksburg, VA 24061', '37.229780', '-80.419970', 'ChIJg10pxnKVTYgRMNbqYQOUKeg'),
+    (3, 'McComas Hall', '895 Washington St. SW, Blacksburg, VA 24061', '37.220690', '-80.422300', 'ChIJi9BjOxCVTYgRX0v2h_vGkw0'),
+    (4, 'War Memorial Hall', '370 Drillfield Drive, Blacksburg, VA 24061', '37.226290', '-80.420590', 'EiwzNzAgRHJpbGxmaWVsZCBEciwgQmxhY2tzYnVyZywgVkEgMjQwNjEsIFVTQSIxEi8KFAoSCdlH04ESlU2IEe67gQo6mbjbEPICKhQKEgmxhF-REpVNiBHe3jDxSBoQeg'),
+    (5, 'Squires Student Center', '290 College Ave., Blacksburg, VA 24061', '37.229620', '-80.417960', 'ChIJTcvBOnOVTYgRUgn8IWXH2fg');
 
 -- -----------------------------------------------------------------------------
 -- ResourceCategory

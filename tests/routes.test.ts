@@ -16,6 +16,14 @@ describe("application routes", () => {
     expect(parseLocation("#/users/0").route.id).toBe("profile");
   });
 
+  it("exposes Maps to regular users and admins", () => {
+    const maps = routes.find((route) => route.id === "maps");
+
+    expect(maps?.label).toBe("Maps");
+    expect(maps?.adminOnly).toBeUndefined();
+    expect(parseLocation("#/maps").route.id).toBe("maps");
+  });
+
   it("exposes admin sections as admin-only CampusConnect routes", () => {
     expect(routes.filter((route) => route.adminOnly).map((route) => route.label)).toEqual([
       "Overview",

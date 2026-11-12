@@ -20,6 +20,26 @@ export type NamedOption = {
   name: string
 }
 
+export type MapBuilding = {
+  id: number
+  name: string
+  address: string
+  latitude: number
+  longitude: number
+  googlePlaceId: string | null
+}
+
+export type MapBuildingPhoto = {
+  url: string
+  authorAttributions: Array<{ displayName: string; uri: string }>
+}
+
+export type MapBuildingDetails = {
+  building: MapBuilding
+  photos: MapBuildingPhoto[]
+  photoError: string | null
+}
+
 export type ResourceSummary = {
   id: number
   name: string

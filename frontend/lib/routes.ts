@@ -2,6 +2,7 @@ export type RouteId =
   | 'profile'
   | 'users'
   | 'resources'
+  | 'maps'
   | 'reservations'
   | 'credits'
   | 'activity'
@@ -45,6 +46,16 @@ export const routes: AppRoute[] = [
     label: 'Browse Resources',
     description: 'Search campus resources by type, building, date, time, and availability.',
     icon: ['M10.5 4a6.5 6.5 0 1 1 0 13a6.5 6.5 0 1 1 0-13Z', 'M15.5 15.5 20 20'],
+  },
+  {
+    id: 'maps',
+    label: 'Maps',
+    description: 'Explore Virginia Tech’s Blacksburg campus with an interactive map.',
+    icon: [
+      'M4 6.5 12 3l8 3.5-8 3.5L4 6.5Z',
+      'M4 6.5v11L12 21l8-3.5v-11',
+      'M12 10v11',
+    ],
   },
   {
     id: 'reservations',

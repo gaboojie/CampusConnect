@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-labelledby="title desc">
+  <title id="title">Virginia Tech building placeholder</title>
+  <desc id="desc">A stylized Hokie Stone campus building.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#f4e9ee"/>
+      <stop offset="1" stop-color="#e8d4de"/>
+    </linearGradient>
+    <linearGradient id="stone" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#b8a99b"/>
+      <stop offset="1" stop-color="#8d8178"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#sky)"/>
+  <path d="M0 397h800v103H0z" fill="#6b7780"/>
+  <path d="M115 398V240l285-132 285 132v158z" fill="url(#stone)" stroke="#6c625a" stroke-width="8"/>
+  <path d="M84 247h632L400 88z" fill="#630031" stroke="#4b0025" stroke-width="8"/>
+  <path d="M377 151h46v247h-46z" fill="#6e655e"/>
+  <path d="M155 281h490v117H155z" fill="#a99b90"/>
+  <g fill="#f3e4cf" stroke="#766b62" stroke-width="5">
+    <path d="M187 301h62v97h-62zM275 301h62v97h-62zM463 301h62v97h-62zM551 301h62v97h-62z"/>
+  </g>
+  <path d="M330 398v-91h140v91z" fill="#630031"/>
+  <path d="M350 398v-68h100v68z" fill="#d5c6b9"/>
+  <path d="M0 398h800" stroke="#f4e9ee" stroke-width="8" opacity=".75"/>
+</svg>

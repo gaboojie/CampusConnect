@@ -58,6 +58,11 @@ import {
 import { getAnnouncements, parseAnnouncementQuery } from "../db/repositories/announcements";
 import { getMyAnalytics } from "../db/repositories/analytics";
 import {
+  findMapBuildingById,
+  listMapBuildings,
+} from "../db/repositories/maps";
+import { fetchPlacePhotos, type PlacePhoto } from "./places";
+import {
   createReservationReview,
   listOwnerReservationReviews,
   listUserReservationReviews,
@@ -117,6 +122,9 @@ type Bindings = {
   RESOURCE_IMAGES?: R2Bucket;
   APP_ENV?: string;
   PUBLIC_APP_ORIGIN?: string;
+  GOOGLE_MAPS_JAVASCRIPT_API_KEY?: string;
+  GOOGLE_MAPS_MAP_ID?: string;
+  GOOGLE_PLACES_API_KEY?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   NOTIFICATION_WORKFLOW?: Workflow<NotificationWorkflowPayload>;
@@ -131,6 +139,7 @@ type AppEnv = {
 
 type AppOptions = {
   createDatabaseClient?: DatabaseClientFactory;
+  fetchGooglePlaces?: typeof fetch;
   sendVerificationEmail?: VerificationEmailSender;
   startNotificationWorkflows?: (
     binding: NotificationWorkflowBinding,
@@ -777,6 +786,70 @@ export function createApp(options: AppOptions = {}) {
   });
 
   app.get("/api/auth/me", (c) => c.json({ user: c.get("user") }));
+
+  app.get("/api/maps/config", (c) => c.json({
+    googleMapsJavaScriptApiKey: c.env.GOOGLE_MAPS_JAVASCRIPT_API_KEY?.trim() || null,
+    mapId: c.env.GOOGLE_MAPS_MAP_ID?.trim() || null,
+  }));
+
+  app.get("/api/maps/buildings", async (c) => {
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const buildings = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => listMapBuildings(client),
+      );
+      return c.json({ buildings });
+    } catch {
+      return c.json({ error: "Unable to load campus buildings right now." }, 503);
+    }
+  });
+
+  app.get("/api/maps/buildings/:id/details", async (c) => {
+    const buildingId = parsePositiveId(c.req.param("id"));
+    if (buildingId === null) {
+      return c.json({ error: "Building id must be a positive whole number." }, 400);
+    }
+    if (!c.env.DB) return databaseUnavailable(c);
+
+    try {
+      const building = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => findMapBuildingById(client, buildingId),
+      );
+      if (!building) return c.json({ error: "Building not found." }, 404);
+
+      const apiKey = c.env.GOOGLE_PLACES_API_KEY?.trim() || "";
+      if (!building.googlePlaceId || !apiKey) {
+        return c.json({
+          building,
+          photos: [],
+          photoError: building.googlePlaceId && !apiKey
+            ? "Google building photos are not configured for this environment."
+            : null,
+        });
+      }
+
+      let photos: PlacePhoto[] = [];
+      let photoError: string | null = null;
+      try {
+        photos = await fetchPlacePhotos(
+          building.googlePlaceId,
+          apiKey,
+          options.fetchGooglePlaces ?? fetch,
+        );
+      } catch {
+        photoError = "Building photos are unavailable right now.";
+      }
+
+      return c.json({ building, photos, photoError });
+    } catch {
+      return c.json({ error: "Unable to load this building right now." }, 503);
+    }
+  });
 
   app.get("/api/profile-images/:id", async (c) => {
     const imageId = parsePositiveId(c.req.param("id"));

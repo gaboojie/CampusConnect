@@ -226,6 +226,20 @@ describe("GET /api/resources", () => {
     expectReadOnly(database.queries);
   });
 
+  it("scopes resource results to the selected building", async () => {
+    const database = new FakeReadDatabase()
+      .respond("SELECT COUNT(*)", [{ total: 1 }])
+      .respond("SELECT r.resource_id, r.name, r.description, r.capacity", [summaryRow]);
+    const { get } = setup(database);
+
+    const response = await get("/api/resources?building=5&limit=50");
+
+    expect(response.status).toBe(200);
+    expect(database.queries[0].values).toEqual([5]);
+    expect(database.queries[1].values).toEqual([5, 50, 0]);
+    expectReadOnly(database.queries);
+  });
+
   it("rejects invalid filters before touching the database", async () => {
     const { get, database } = setup();
     const response = await get("/api/resources?date=2026-10-20&start=11:00&end=10:00");
