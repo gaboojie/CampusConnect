@@ -3,6 +3,10 @@ import {
   ADMIN_COMMAND_USAGE,
   parseAdminCommandArgs,
 } from "../db/scripts/admin-command";
+import {
+  VERIFY_USER_EMAIL_USAGE,
+  parseVerifyUserEmailArgs,
+} from "../db/scripts/verify-user-email";
 
 describe("admin command arguments", () => {
   it("parses a ban action", () => {
@@ -44,5 +48,26 @@ describe("admin command arguments", () => {
 
   it("provides help text", () => {
     expect(() => parseAdminCommandArgs(["--help"])).toThrow(ADMIN_COMMAND_USAGE);
+  });
+});
+
+describe("verify user email arguments", () => {
+  it("requires one username and one environment", () => {
+    expect(parseVerifyUserEmailArgs(["--user", "maya_r", "--env", "dev"])).toEqual({
+      environment: "dev",
+      username: "maya_r",
+    });
+  });
+
+  it("rejects missing, invalid, or conflicting arguments", () => {
+    expect(() => parseVerifyUserEmailArgs(["--user", "maya_r"])).toThrow("--env is required");
+    expect(() => parseVerifyUserEmailArgs(["--user", "maya_r", "--env", "staging"]))
+      .toThrow("--env must be dev or prod");
+    expect(() => parseVerifyUserEmailArgs(["--user", "maya_r", "--user", "other", "--env", "dev"]))
+      .toThrow("--user may only be provided once");
+  });
+
+  it("provides help text", () => {
+    expect(() => parseVerifyUserEmailArgs(["--help"])).toThrow(VERIFY_USER_EMAIL_USAGE);
   });
 });

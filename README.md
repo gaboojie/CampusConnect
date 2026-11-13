@@ -196,6 +196,15 @@ npm run admin:command -- --user maya_r --role admin --env prod
 
 The command accepts exactly one action: `--ban true|false`, `--delete`, `--can_add_resources true|false`, or `--role admin|user`. The `user` role maps to the database's `student` role. Use `--help` to print the full usage text. Deletion permanently removes the user and dependent database rows, including credit transactions; SQL cannot remove corresponding R2 image objects.
 
+If email delivery is unavailable, an administrator can verify one active user directly in PostgreSQL:
+
+```sh
+npm run verify:user-email -- --user maya_r --env dev
+npm run verify:user-email -- --user maya_r --env prod
+```
+
+This command requires both `--user` and `--env`, loads only the selected environment's connection string, locks the matching user row, sets `email_verified_at` to the database timestamp, and invalidates any unused email-verification token. It refuses banned or deleted accounts and does not create a session or change any other account fields.
+
 ## Project structure
 
 ```text
