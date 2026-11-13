@@ -67,6 +67,7 @@ export type ResourceSummary = {
   averageRating: number | null;
   reviewCount: number;
   thumbnailUrl: string | null;
+  isUnderMaintenance?: boolean;
 };
 
 export type ResourceSearchResult = {
@@ -84,6 +85,7 @@ export type ResourceFilters = {
 
 export type ResourceDetails = {
   id: number;
+  isOwner: boolean;
   name: string;
   description: string;
   locationDescription: string;
@@ -97,6 +99,9 @@ export type ResourceDetails = {
   };
   capacity: number;
   requiredCredits: number;
+  minUserReviewScore: number | null;
+  viewerReviewScore: number | null;
+  viewerReviewCount: number;
   maxReservationMinutes: number | null;
   ownerUsername: string;
   createdAt: string;
@@ -140,7 +145,7 @@ export function parsePositiveId(raw: string | undefined | null): number | null {
   return value >= 1 && value <= MAX_INTEGER_ID ? value : null;
 }
 
-function isCalendarDate(value: string): boolean {
+export function isCalendarDate(value: string): boolean {
   const match = DATE_PATTERN.exec(value);
   if (!match) return false;
   const [year, month, day] = match.slice(1).map(Number);
@@ -429,7 +434,14 @@ export function buildResourceSearchQueries(search: ResourceSearch): {
           b.building_name,
           img.image_id,
           rating.average_rating,
-          COALESCE(rating.review_count, 0) AS review_count
+          COALESCE(rating.review_count, 0) AS review_count,
+          EXISTS (
+            SELECT 1
+            FROM "MaintenancePeriod" AS mp
+            WHERE mp.resource_id = r.resource_id
+              AND mp.start_time <= ${CAMPUS_NOW_SQL}
+              AND mp.end_time > ${CAMPUS_NOW_SQL}
+          ) AS is_under_maintenance
         FROM "Resource" AS r
         JOIN "ResourceCategory" AS c ON c.category_id = r.category_id
         JOIN "Building" AS b ON b.building_id = r.building_id
@@ -463,6 +475,7 @@ type ResourceSummaryRow = {
   average_rating: number | string | null;
   review_count: number | string;
   image_id: number | null;
+  is_under_maintenance?: boolean;
 };
 
 function toNumberOrNull(value: number | string | null | undefined): number | null {
@@ -503,6 +516,7 @@ export async function searchResources(
       averageRating: toNumberOrNull(row.average_rating),
       reviewCount: Number(row.review_count),
       thumbnailUrl: row.image_id == null ? null : resourceImageUrl(row.image_id),
+      ...(row.is_under_maintenance ? { isUnderMaintenance: true } : {}),
     })),
     total: Number(countResult.rows[0]?.total ?? 0),
     limit: search.limit,
@@ -542,11 +556,13 @@ export async function getResourceFilters(client: DatabaseClient): Promise<Resour
 
 type ResourceDetailRow = {
   resource_id: number;
+  is_owner: boolean;
   name: string;
   description: string;
   location_description: string;
   capacity: number;
   required_credits: number;
+  min_user_review_score: number | string | null;
   max_reservation_minutes: number | null;
   created_at: string;
   category_id: number;
@@ -562,6 +578,8 @@ type ResourceDetailRow = {
   image_alt_text: string | null;
   average_rating: number | string | null;
   review_count: number | string;
+  viewer_review_score: number | string | null;
+  viewer_review_count: number | string;
 };
 
 // Weekly hours are not stored per weekday: ResourceAvailability holds a window that
@@ -632,7 +650,23 @@ export const WEEKLY_HOURS_SQL = `
 export async function getResourceDetails(
   client: DatabaseClient,
   resourceId: number,
+  viewerUserId?: number,
 ): Promise<ResourceDetails | null> {
+  const viewerScoreSelect = viewerUserId === undefined
+    ? "NULL::float8 AS viewer_review_score, 0::integer AS viewer_review_count"
+    : "viewer_rating.average_rating AS viewer_review_score, COALESCE(viewer_rating.review_count, 0) AS viewer_review_count";
+  const viewerScoreJoin = viewerUserId === undefined
+    ? ""
+    : `
+      LEFT JOIN LATERAL (
+        SELECT
+          ROUND(AVG(rr.rating)::numeric, 2)::float8 AS average_rating,
+          COUNT(*)::integer AS review_count
+        FROM "UserReview" AS rr
+        WHERE rr.reviewee_user_id = $2
+      ) AS viewer_rating ON TRUE
+    `;
+
   const resourceResult = await client.query<ResourceDetailRow>(
     `
       SELECT
@@ -653,10 +687,13 @@ export async function getResourceDetails(
         b.latitude AS building_latitude,
         b.longitude AS building_longitude,
         u.username AS owner_username,
+        ${viewerUserId === undefined ? "FALSE" : "r.owner_id = $2"} AS is_owner,
         img.image_id,
         img.alt_text AS image_alt_text,
+        r.min_user_review_score,
         rating.average_rating,
-        COALESCE(rating.review_count, 0) AS review_count
+        COALESCE(rating.review_count, 0) AS review_count,
+        ${viewerScoreSelect}
       FROM "Resource" AS r
       JOIN "ResourceCategory" AS c ON c.category_id = r.category_id
       JOIN "Building" AS b ON b.building_id = r.building_id
@@ -671,9 +708,10 @@ export async function getResourceDetails(
         WHERE resource_id = $1
         GROUP BY resource_id
       ) AS rating ON rating.resource_id = r.resource_id
+      ${viewerScoreJoin}
       WHERE r.resource_id = $1
     `,
-    [resourceId],
+    viewerUserId === undefined ? [resourceId] : [resourceId, viewerUserId],
   );
   const resource = resourceResult.rows[0];
 
@@ -754,6 +792,7 @@ export async function getResourceDetails(
 
   return {
     id: resource.resource_id,
+    isOwner: resource.is_owner === true,
     name: resource.name,
     description: resource.description,
     locationDescription: resource.location_description,
@@ -771,6 +810,9 @@ export async function getResourceDetails(
     },
     capacity: resource.capacity,
     requiredCredits: resource.required_credits,
+    minUserReviewScore: toNumberOrNull(resource.min_user_review_score),
+    viewerReviewScore: toNumberOrNull(resource.viewer_review_score),
+    viewerReviewCount: Number(resource.viewer_review_count ?? 0),
     maxReservationMinutes: toNumberOrNull(resource.max_reservation_minutes),
     ownerUsername: resource.owner_username,
     createdAt: resource.created_at,

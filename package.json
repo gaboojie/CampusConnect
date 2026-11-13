@@ -14,11 +14,12 @@
     "check": "svelte-check --tsconfig ./frontend/tsconfig.json && tsc -p tsconfig.node.json",
     "typecheck": "tsc -p backend/tsconfig.json --noEmit",
     "test": "vitest run",
-    "worker:dev": "CLOUDFLARE_ENV=dev wrangler dev --env dev",
+    "worker:dev": "npm run build && CLOUDFLARE_ENV=dev wrangler dev --env dev",
     "worker:deploy:production": "wrangler deploy --env production",
     "migrate": "tsx db/scripts/migrate.ts --environment dev",
     "migrate:dev": "tsx db/scripts/migrate.ts --environment dev",
     "migrate:prod": "tsx db/scripts/migrate.ts --environment prod",
+    "admin:command": "tsx db/scripts/admin-command.ts",
     "db:reset": "tsx db/scripts/reset-database.ts"
   },
   "devDependencies": {
@@ -36,6 +37,7 @@
     "wrangler": "^4.149.0"
   },
   "dependencies": {
+    "@googlemaps/js-api-loader": "^2.1.3",
     "hono": "^4.13.13",
     "pg": "^8.23.1"
   }

@@ -3,6 +3,9 @@
   import { getJson } from '../../lib/api'
   import { adminHash } from '../../lib/adminRoutes'
   import type { AdminStats } from '../../lib/types'
+  import AdminActivityChart from '../AdminActivityChart.svelte'
+  import BarList from '../BarList.svelte'
+  import PieChart from '../PieChart.svelte'
 
   let stats: AdminStats | null = null
   let loading = true
@@ -20,6 +23,13 @@
 
   const ROLE_ORDER = ['admin', 'staff', 'student']
   const STATUS_ORDER = ['confirmed', 'active', 'completed', 'cancelled']
+  const STATUS_COLORS: Record<string, string> = {
+    confirmed: '#3b6fb6',
+    active: '#2f8f6b',
+    completed: '#7b8794',
+    cancelled: '#c04a4a',
+  }
+  const ROLE_COLORS: Record<string, string> = { admin: '#630031', staff: '#e5751f', student: '#3b6fb6' }
 </script>
 
 <section class="admin-page">
@@ -49,26 +59,46 @@
       </a>
     </div>
 
+    <section class="panel chart-panel">
+      <h3>Last {stats.activity.length} days</h3>
+      <p class="muted">Bookings made and new accounts per day.</p>
+      <AdminActivityChart data={stats.activity} />
+    </section>
+
     <div class="admin-columns">
       <section class="panel">
-        <h3>Accounts</h3>
-        <dl class="profile-details">
-          <div><dt>Verified</dt><dd>{stats.users.verified}</dd></div>
-          <div><dt>Awaiting verification</dt><dd>{stats.users.unverified}</dd></div>
-          <div><dt>Banned</dt><dd>{stats.users.banned}</dd></div>
-          {#each ROLE_ORDER as role}
-            <div><dt>{role[0].toUpperCase() + role.slice(1)}s</dt><dd>{stats.users.byRole[role] ?? 0}</dd></div>
-          {/each}
-        </dl>
+        <h3>Reservations by status</h3>
+        <PieChart
+          label="Reservations by status"
+          items={STATUS_ORDER.map((status) => ({
+            label: status[0].toUpperCase() + status.slice(1),
+            value: stats?.reservations.byStatus[status] ?? 0,
+            color: STATUS_COLORS[status],
+          }))}
+        />
       </section>
 
       <section class="panel">
-        <h3>Reservations by status</h3>
-        <dl class="profile-details">
-          {#each STATUS_ORDER as status}
-            <div><dt>{status[0].toUpperCase() + status.slice(1)}</dt><dd>{stats.reservations.byStatus[status] ?? 0}</dd></div>
-          {/each}
-        </dl>
+        <h3>Users by role</h3>
+        <PieChart
+          label="Users by role"
+          items={ROLE_ORDER.map((role) => ({
+            label: role[0].toUpperCase() + role.slice(1) + 's',
+            value: stats?.users.byRole[role] ?? 0,
+            color: ROLE_COLORS[role],
+          }))}
+        />
+      </section>
+
+      <section class="panel">
+        <h3>Account health</h3>
+        <BarList
+          items={[
+            { label: 'Verified', value: stats.users.verified, color: '#2f8f6b' },
+            { label: 'Awaiting verification', value: stats.users.unverified, color: '#d9a21b' },
+            { label: 'Banned', value: stats.users.banned, color: '#c04a4a' },
+          ]}
+        />
       </section>
     </div>
   {/if}

@@ -17,13 +17,11 @@ const sessionUser: DatabaseUserRow = {
   user_id: 6,
   username: "maya_r",
   email: "maya.r@vt.edu",
-  phone_number: null,
   role: "student",
   created_at: new Date("2026-08-24T10:00:00Z"),
   credit_balance: 20,
   credit_last_reset: new Date("2026-10-01T00:00:00Z"),
   email_notifications_on: true,
-  text_notifications_on: false,
   can_add_resources: false,
   is_banned: false,
 };
@@ -36,6 +34,7 @@ export class FakeReadDatabase {
   private responders: Responder[] = [];
   failWith: Error | null = null;
   sessionRole = sessionUser.role;
+  sessionBanned = false;
 
   respond(match: string | ((query: string) => boolean), rows: unknown[] | ((values: readonly unknown[]) => unknown[])) {
     this.responders.push({
@@ -57,7 +56,12 @@ export class FakeReadDatabase {
 
         if (query.startsWith("SELECT u.user_id") && query.includes('FROM "Session"')) {
           const valid = values[0] === (await hashSessionToken(SESSION_TOKEN));
-          return { rows: valid ? [{ ...sessionUser, role: this.sessionRole } as T] : [], rowCount: valid ? 1 : 0 };
+          return {
+            rows: valid
+              ? [{ ...sessionUser, role: this.sessionRole, is_banned: this.sessionBanned } as T]
+              : [],
+            rowCount: valid ? 1 : 0,
+          };
         }
 
         this.queries.push({ text: query, values });

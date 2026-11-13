@@ -19,9 +19,9 @@
 --
 -- Credit rules used (assumptions; not defined in the Phase 3 documents):
 --   * New accounts receive 20 credits ('initial_grant').
---   * On the 1st of each month the balance is reset to 20; unused credits do
---     not roll over. A 'monthly_reset' row records the top-up amount and is
---     only written when the balance changes.
+--   * Active accounts receive an additive 20-credit 'monthly_reset' for every
+--     completed 30-day period since their last credit grant. Historical seed
+--     rows below preserve the original snapshot and are not rewritten.
 --   * Booking deducts the resource's required_credits once ('reservation_charge').
 --   * Cancelling >= 24 hours before the start is fully refunded ('refund');
 --     later cancellations and no-shows are not refunded.
@@ -34,62 +34,62 @@
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- ImageMetadata (synthetic metadata; no claim that these R2 objects exist)
+-- ImageMetadata (metadata matches db/reference/seed_images; R2 objects are uploaded separately)
 -- -----------------------------------------------------------------------------
 INSERT INTO "ImageMetadata" (image_id, object_key, content_type, size, width, height, alt_text, status, uploaded_at, filename) VALUES
-    (1, 'resources/4/newman-group-study-4.jpg', 'image/jpeg', 412388, 1600, 1067, 'Group study room with a table, chairs, and a wall display', 'ready', '2026-08-14 10:05:00', 'newman_study_room_4.jpg'),
-    (2, 'resources/10/mccomas-court-1.jpg', 'image/jpeg', 538904, 1920, 1080, 'Indoor basketball court with hardwood floor', 'ready', '2026-08-14 10:20:00', 'mccomas_court1.jpg'),
-    (3, 'resources/12/mccomas-lap-lane-1.jpg', 'image/jpeg', 466120, 1920, 1080, 'Lap lane in an indoor pool', 'ready', '2026-08-14 10:30:00', 'pool_lane1.jpg'),
-    (4, 'resources/14/war-memorial-racquetball-1.jpg', 'image/webp', 201776, 1600, 900, 'Enclosed racquetball court', 'ready', '2026-08-14 11:00:00', 'racquetball_court_1.webp'),
-    (5, 'resources/20/war-memorial-yoga-studio.jpg', 'image/jpeg', 389450, 1600, 1067, 'Yoga studio with mats laid out', 'ready', '2026-08-14 11:10:00', 'yoga_studio.jpg'),
-    (6, 'resources/21/squires-meeting-room-a.jpg', 'image/jpeg', 357002, 1600, 1067, NULL, 'ready', '2026-08-14 14:30:00', 'squires_mtg_a.jpg'),
-    (7, 'users/6/avatar.png', 'image/png', 88311, 512, 512, 'Profile photo', 'ready', '2026-08-24 10:30:00', 'me.png'),
-    (8, 'users/8/avatar.jpg', 'image/jpeg', 64870, 400, 400, NULL, 'ready', '2026-08-20 11:20:00', 'IMG_4471.jpg'),
-    (9, 'users/12/avatar.jpg', 'image/jpeg', 71245, 400, 400, 'Profile photo', 'ready', '2026-08-24 14:00:00', 'profile.jpg');
+    (1, 'resources/4/newman-group-study-4.jpg', 'image/jpeg', 116020, 900, 678, 'Group study room with a table, chairs, and a wall display', 'ready', '2026-08-14 10:05:00', 'newman-group-study-4.jpg'),
+    (2, 'resources/10/mccomas-court-1.jpeg', 'image/jpeg', 41612, 678, 452, 'Indoor basketball court with hardwood floor', 'ready', '2026-08-14 10:20:00', 'mccomas-court-1.jpeg'),
+    (3, 'resources/12/mccomas-lap-lane-1.jpg', 'image/jpeg', 160983, 1024, 768, 'Lap lane in an indoor pool', 'ready', '2026-08-14 10:30:00', 'mccomas-lap-lane-1.jpg'),
+    (4, 'resources/14/war-memorial-racquetball-1.jpeg', 'image/jpeg', 10492, 547, 365, 'Enclosed racquetball court', 'ready', '2026-08-14 11:00:00', 'war-memorial-racquetball-1.jpeg'),
+    (5, 'resources/20/war-memorial-yoga-studio.jpeg', 'image/jpeg', 4971, 299, 168, 'Yoga studio with mats laid out', 'ready', '2026-08-14 11:10:00', 'war-memorial-yoga-studio.jpeg'),
+    (6, 'resources/21/squires-meeting-room-a.jpeg', 'image/jpeg', 32923, 638, 480, NULL, 'ready', '2026-08-14 14:30:00', 'squires-meeting-room-a.jpeg'),
+    (7, 'users/6/avatar-1.jpeg', 'image/jpeg', 6328, 500, 500, 'Profile photo', 'ready', '2026-08-24 10:30:00', 'avatar-1.jpeg'),
+    (8, 'users/8/avatar-2.jpeg', 'image/jpeg', 16396, 425, 470, NULL, 'ready', '2026-08-20 11:20:00', 'avatar-2.jpeg'),
+    (9, 'users/12/avatar-3.png', 'image/png', 9496, 300, 300, 'Profile photo', 'ready', '2026-08-24 14:00:00', 'avatar-3.png');
 
 -- -----------------------------------------------------------------------------
--- User (fictional accounts; example.com addresses; 555-01xx fictional phone numbers)
+-- User (fictional accounts; example.com addresses)
 -- credit_balance and credit_last_reset are derived from the credit timeline.
 -- Every seeded account uses the demo-only password CampusConnect123! and is
 -- marked as verified so the sample data can be used to exercise login.
 -- -----------------------------------------------------------------------------
-INSERT INTO "User" (user_id, username, email, password_hash, email_verified_at, phone_number, role, created_at, credit_balance, credit_last_reset, is_banned, can_add_resources, email_notifications_on, text_notifications_on, profile_image_id) VALUES
+INSERT INTO "User" (user_id, username, email, password_hash, email_verified_at, role, created_at, credit_balance, credit_last_reset, is_banned, can_add_resources, email_notifications_on, profile_image_id) VALUES
     -- Owner account
-    (1, 'cc_admin', 'cc.admin@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-10 09:00:00', NULL, 'admin', '2026-08-10 09:00:00', 20, '2026-10-01', FALSE, TRUE, TRUE, FALSE, NULL),
+    (1, 'cc_admin', 'cc.admin@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-10 09:00:00', 'admin', '2026-08-10 09:00:00', 20, '2026-10-01', FALSE, TRUE, TRUE, NULL),
     -- Owner account
-    (2, 'newman_spaces_rk', 'newman.spaces.rk@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-10 10:30:00', NULL, 'staff', '2026-08-10 10:30:00', 20, '2026-10-01', FALSE, TRUE, TRUE, FALSE, NULL),
+    (2, 'newman_spaces_rk', 'newman.spaces.rk@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-10 10:30:00', 'staff', '2026-08-10 10:30:00', 20, '2026-10-01', FALSE, TRUE, TRUE, NULL),
     -- Owner account
-    (3, 'recsports_mccomas_tj', 'recsports.mccomas.tj@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-11 09:15:00', NULL, 'staff', '2026-08-11 09:15:00', 20, '2026-10-01', FALSE, TRUE, TRUE, FALSE, NULL),
+    (3, 'recsports_mccomas_tj', 'recsports.mccomas.tj@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-11 09:15:00', 'staff', '2026-08-11 09:15:00', 20, '2026-10-01', FALSE, TRUE, TRUE, NULL),
     -- Owner account
-    (4, 'recsports_warmem_ab', 'recsports.warmem.ab@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-11 09:40:00', NULL, 'staff', '2026-08-11 09:40:00', 20, '2026-10-01', FALSE, TRUE, TRUE, FALSE, NULL),
+    (4, 'recsports_warmem_ab', 'recsports.warmem.ab@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-11 09:40:00', 'staff', '2026-08-11 09:40:00', 20, '2026-10-01', FALSE, TRUE, TRUE, NULL),
     -- Owner account
-    (5, 'squires_events_mp', 'squires.events.mp@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-12 13:20:00', NULL, 'staff', '2026-08-12 13:20:00', 20, '2026-10-01', FALSE, TRUE, TRUE, FALSE, NULL),
+    (5, 'squires_events_mp', 'squires.events.mp@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-12 13:20:00', 'staff', '2026-08-12 13:20:00', 20, '2026-10-01', FALSE, TRUE, TRUE, NULL),
     -- Journey A
-    (6, 'maya_r', 'maya.r@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-24 10:15:00', '+15405550106', 'student', '2026-08-24 10:15:00', 18, '2026-10-01', FALSE, FALSE, TRUE, TRUE, 7),
+    (6, 'maya_r', 'maya.r@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-24 10:15:00', 'student', '2026-08-24 10:15:00', 18, '2026-10-01', FALSE, FALSE, TRUE, 7),
     -- Journey B
-    (7, 'liam_k', 'liam.k@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-26 16:45:00', '+15405550107', 'student', '2026-08-26 16:45:00', 20, '2026-10-01', FALSE, FALSE, TRUE, FALSE, NULL),
+    (7, 'liam_k', 'liam.k@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-26 16:45:00', 'student', '2026-08-26 16:45:00', 20, '2026-10-01', FALSE, FALSE, TRUE, NULL),
     -- Journey C
-    (8, 'priya_s', 'priya.s@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-20 11:05:00', '+15405550108', 'student', '2026-08-20 11:05:00', 15, '2026-10-01', FALSE, FALSE, TRUE, TRUE, 8),
+    (8, 'priya_s', 'priya.s@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-20 11:05:00', 'student', '2026-08-20 11:05:00', 15, '2026-10-01', FALSE, FALSE, TRUE, 8),
     -- Journey D
-    (9, 'diego_m', 'diego.m@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-03 10:00:00', '+15405550109', 'student', '2026-09-03 10:00:00', 19, '2026-10-01', FALSE, FALSE, TRUE, TRUE, NULL),
-    (10, 'hannah_w', 'hannah.w@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-21 09:30:00', NULL, 'student', '2026-08-21 09:30:00', 18, '2026-10-01', FALSE, FALSE, TRUE, FALSE, NULL),
-    (11, 'noah_b', 'noah.b@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-22 20:10:00', '+15405550111', 'student', '2026-08-22 20:10:00', 16, '2026-10-01', FALSE, FALSE, TRUE, TRUE, NULL),
-    (12, 'sofia_l', 'sofia.l@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-24 13:40:00', '+15405550112', 'student', '2026-08-24 13:40:00', 17, '2026-10-01', FALSE, FALSE, TRUE, FALSE, 9),
-    (13, 'ethan_c', 'ethan.c@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-25 15:00:00', NULL, 'student', '2026-08-25 15:00:00', 18, '2026-10-01', FALSE, FALSE, FALSE, FALSE, NULL),
-    (14, 'zara_h', 'zara.h@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-27 08:20:00', '+15405550114', 'student', '2026-08-27 08:20:00', 17, '2026-10-01', FALSE, FALSE, TRUE, TRUE, NULL),
-    (15, 'owen_p', 'owen.p@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-28 12:00:00', NULL, 'student', '2026-08-28 12:00:00', 20, '2026-10-01', FALSE, FALSE, TRUE, FALSE, NULL),
-    (16, 'aisha_n', 'aisha.n@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-30 17:35:00', '+15405550116', 'student', '2026-08-30 17:35:00', 19, '2026-10-01', FALSE, FALSE, TRUE, FALSE, NULL),
-    (17, 'lucas_g', 'lucas.g@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-01 14:10:00', '+15405550117', 'student', '2026-09-01 14:10:00', 19, '2026-10-01', FALSE, FALSE, FALSE, TRUE, NULL),
-    (18, 'chloe_d', 'chloe.d@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-02 06:50:00', '+15405550118', 'student', '2026-09-02 06:50:00', 18, '2026-10-01', FALSE, FALSE, TRUE, TRUE, NULL),
-    (19, 'marcus_t', 'marcus.t@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-04 19:25:00', NULL, 'student', '2026-09-04 19:25:00', 18, '2026-10-01', FALSE, FALSE, TRUE, FALSE, NULL),
-    (20, 'elena_v', 'elena.v@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-05 10:45:00', '+15405550120', 'student', '2026-09-05 10:45:00', 20, '2026-10-01', FALSE, FALSE, TRUE, FALSE, NULL),
-    (21, 'ben_o', 'ben.o@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-08 21:00:00', NULL, 'student', '2026-09-08 21:00:00', 17, '2026-10-01', FALSE, FALSE, TRUE, FALSE, NULL),
-    (22, 'grace_y', 'grace.y@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-10 12:30:00', '+15405550122', 'student', '2026-09-10 12:30:00', 17, '2026-10-01', FALSE, FALSE, TRUE, TRUE, NULL),
+    (9, 'diego_m', 'diego.m@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-03 10:00:00', 'student', '2026-09-03 10:00:00', 19, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (10, 'hannah_w', 'hannah.w@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-21 09:30:00', 'student', '2026-08-21 09:30:00', 18, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (11, 'noah_b', 'noah.b@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-22 20:10:00', 'student', '2026-08-22 20:10:00', 16, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (12, 'sofia_l', 'sofia.l@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-24 13:40:00', 'student', '2026-08-24 13:40:00', 17, '2026-10-01', FALSE, FALSE, TRUE, 9),
+    (13, 'ethan_c', 'ethan.c@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-25 15:00:00', 'student', '2026-08-25 15:00:00', 18, '2026-10-01', FALSE, FALSE, FALSE, NULL),
+    (14, 'zara_h', 'zara.h@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-27 08:20:00', 'student', '2026-08-27 08:20:00', 17, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (15, 'owen_p', 'owen.p@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-28 12:00:00', 'student', '2026-08-28 12:00:00', 20, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (16, 'aisha_n', 'aisha.n@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-08-30 17:35:00', 'student', '2026-08-30 17:35:00', 19, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (17, 'lucas_g', 'lucas.g@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-01 14:10:00', 'student', '2026-09-01 14:10:00', 19, '2026-10-01', FALSE, FALSE, FALSE, NULL),
+    (18, 'chloe_d', 'chloe.d@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-02 06:50:00', 'student', '2026-09-02 06:50:00', 18, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (19, 'marcus_t', 'marcus.t@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-04 19:25:00', 'student', '2026-09-04 19:25:00', 18, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (20, 'elena_v', 'elena.v@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-05 10:45:00', 'student', '2026-09-05 10:45:00', 20, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (21, 'ben_o', 'ben.o@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-08 21:00:00', 'student', '2026-09-08 21:00:00', 17, '2026-10-01', FALSE, FALSE, TRUE, NULL),
+    (22, 'grace_y', 'grace.y@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-10 12:30:00', 'student', '2026-09-10 12:30:00', 17, '2026-10-01', FALSE, FALSE, TRUE, NULL),
     -- Suspended after two no-shows
-    (23, 'ryan_f', 'ryan.f@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-12 23:10:00', NULL, 'student', '2026-09-12 23:10:00', 12, '2026-09-12', TRUE, FALSE, FALSE, FALSE, NULL),
-    (24, 'nina_j', 'nina.j@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-15 09:55:00', NULL, 'student', '2026-09-15 09:55:00', 19, '2026-10-01', FALSE, FALSE, TRUE, FALSE, NULL),
+    (23, 'ryan_f', 'ryan.f@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-12 23:10:00', 'student', '2026-09-12 23:10:00', 12, '2026-09-12', TRUE, FALSE, FALSE, NULL),
+    (24, 'nina_j', 'nina.j@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-09-15 09:55:00', 'student', '2026-09-15 09:55:00', 19, '2026-10-01', FALSE, FALSE, TRUE, NULL),
     -- Joined 2026-10-09; no reservations yet
-    (25, 'sam_q', 'sam.q@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-10-09 18:40:00', NULL, 'student', '2026-10-09 18:40:00', 20, '2026-10-09', FALSE, FALSE, TRUE, FALSE, NULL);
+    (25, 'sam_q', 'sam.q@example.com', 'pbkdf2_sha256$100000$QkJCQkJCQkJCQkJCQkJCQg$VtcGtF8YYpCFxQuXFLOc2ooANWJhF_sOOSuxtkK0ZdA', '2026-10-09 18:40:00', 'student', '2026-10-09 18:40:00', 20, '2026-10-09', FALSE, FALSE, TRUE, NULL);
 
 -- Seeded accounts are already verified. These are synthetic consumed
 -- SHA-256 token hashes so the verification-token table contains valid
@@ -123,14 +123,14 @@ INSERT INTO "EmailVerificationToken" (user_id, token_hash, created_at, used_at) 
 
 -- -----------------------------------------------------------------------------
 -- Building (names, addresses, coordinates from official vt.edu building pages)
--- google_place_id is NULL: no Place ID was verified.
+-- google_place_id values were verified manually through Google Places.
 -- -----------------------------------------------------------------------------
 INSERT INTO "Building" (building_id, building_name, address, latitude, longitude, google_place_id) VALUES
-    (1, 'Carol M. Newman Library', '560 Drillfield Drive, Blacksburg, VA 24061', '37.228760', '-80.419240', NULL),
-    (2, 'Torgersen Hall', '620 Drillfield Drive, Blacksburg, VA 24061', '37.229780', '-80.419970', NULL),
-    (3, 'McComas Hall', '895 Washington St. SW, Blacksburg, VA 24061', '37.220690', '-80.422300', NULL),
-    (4, 'War Memorial Hall', '370 Drillfield Drive, Blacksburg, VA 24061', '37.226290', '-80.420590', NULL),
-    (5, 'Squires Student Center', '290 College Ave., Blacksburg, VA 24061', '37.229620', '-80.417960', NULL);
+    (1, 'Carol M. Newman Library', '560 Drillfield Drive, Blacksburg, VA 24061', '37.228760', '-80.419240', 'ChIJf8z4LA2VTYgRiVKpkwVghp8'),
+    (2, 'Torgersen Hall', '620 Drillfield Drive, Blacksburg, VA 24061', '37.229780', '-80.419970', 'ChIJg10pxnKVTYgRMNbqYQOUKeg'),
+    (3, 'McComas Hall', '895 Washington St. SW, Blacksburg, VA 24061', '37.220690', '-80.422300', 'ChIJi9BjOxCVTYgRX0v2h_vGkw0'),
+    (4, 'War Memorial Hall', '370 Drillfield Drive, Blacksburg, VA 24061', '37.226290', '-80.420590', 'EiwzNzAgRHJpbGxmaWVsZCBEciwgQmxhY2tzYnVyZywgVkEgMjQwNjEsIFVTQSIxEi8KFAoSCdlH04ESlU2IEe67gQo6mbjbEPICKhQKEgmxhF-REpVNiBHe3jDxSBoQeg'),
+    (5, 'Squires Student Center', '290 College Ave., Blacksburg, VA 24061', '37.229620', '-80.417960', 'ChIJTcvBOnOVTYgRUgn8IWXH2fg');
 
 -- -----------------------------------------------------------------------------
 -- ResourceCategory
@@ -149,29 +149,29 @@ INSERT INTO "ResourceCategory" (category_id, category_name, description) VALUES
 -- Resource locations use the selected building; room-level positions were not
 -- verified. Credits and capacities are fictional.
 -- -----------------------------------------------------------------------------
-INSERT INTO "Resource" (resource_id, owner_id, building_id, category_id, name, description, location_description, max_reservation_time, required_credits, capacity, created_at, resource_image_id) VALUES
-    (1, 2, 1, 1, 'Newman Group Study Room 1', 'Small group study room with a whiteboard and table seating for four.', 'Fourth floor, group study room area', '2 hours', 2, 4, '2026-08-13 10:00:00', NULL),
-    (2, 2, 1, 1, 'Newman Group Study Room 2', 'Small group study room with a whiteboard and table seating for four.', 'Fourth floor, group study room area', '2 hours', 2, 4, '2026-08-13 10:00:00', NULL),
-    (3, 2, 1, 1, 'Newman Group Study Room 3', 'Mid-size group study room with a whiteboard and wall-mounted display.', 'Fourth floor, group study room area', '2 hours', 2, 6, '2026-08-13 10:00:00', NULL),
-    (4, 2, 1, 1, 'Newman Group Study Room 4', 'Mid-size group study room with a whiteboard and wall-mounted display.', 'Fourth floor, group study room area', '2 hours', 2, 6, '2026-08-13 10:00:00', 1),
-    (5, 2, 1, 1, 'Newman Group Study Room 5', 'Large group study room suited to project teams, with a display and two whiteboards.', 'Fourth floor, group study room area', '2 hours', 2, 8, '2026-08-13 10:00:00', NULL),
-    (6, 2, 1, 1, 'Newman Group Study Room 6', 'Large group study room suited to project teams, with a display and two whiteboards.', 'Fourth floor, group study room area', '2 hours', 2, 8, '2026-08-13 10:00:00', NULL),
-    (7, 1, 2, 2, 'Torgersen Project Room 1', 'Project room for team meetings and presentation practice.', 'Torgersen Hall (simulated room; no official room number assigned)', '3 hours', 2, 8, '2026-08-13 09:00:00', NULL),
-    (8, 1, 2, 2, 'Torgersen Project Room 2', 'Project room for team meetings and presentation practice.', 'Torgersen Hall (simulated room; no official room number assigned)', '3 hours', 2, 8, '2026-08-13 09:00:00', NULL),
-    (9, 1, 2, 1, 'Torgersen Atrium Study Table', 'Reservable table in the first-floor atrium study court with laptop power.', 'First-floor atrium (electronic study court)', '2 hours', 1, 4, '2026-08-13 09:00:00', NULL),
-    (10, 3, 3, 3, 'McComas Basketball/Volleyball Court 1', 'Full hardwood court for pickup basketball or volleyball.', 'Gymnasium level, Court 1 of 3', '2 hours', 4, 12, '2026-08-14 09:00:00', 2),
-    (11, 3, 3, 3, 'McComas Basketball/Volleyball Court 2', 'Full hardwood court for pickup basketball or volleyball.', 'Gymnasium level, Court 2 of 3', '2 hours', 4, 12, '2026-08-14 09:00:00', NULL),
-    (12, 3, 3, 5, 'McComas Pool Lap Lane 1', 'One lap lane in the 25-yard, 8-lane pool.', 'McComas pool, Lane 1', '1 hours', 1, 2, '2026-08-14 09:00:00', 3),
-    (13, 3, 3, 6, 'McComas Multipurpose Studio', 'Open multipurpose fitness studio with mats and mirrors.', 'Multipurpose fitness studio', '1 hours 30 minutes', 3, 25, '2026-08-14 09:00:00', NULL),
-    (14, 4, 4, 4, 'War Memorial Racquetball Court 1', 'Enclosed racquetball court.', 'Racquetball court area, Court 1 of 5', '1 hours', 2, 4, '2026-08-14 10:00:00', 4),
-    (15, 4, 4, 4, 'War Memorial Racquetball Court 2', 'Enclosed racquetball court.', 'Racquetball court area, Court 2 of 5', '1 hours', 2, 4, '2026-08-14 10:00:00', NULL),
-    (16, 4, 4, 4, 'War Memorial Squash Court', 'War Memorial Hall''s single squash court.', 'Squash court', '1 hours', 2, 4, '2026-08-14 10:00:00', NULL),
-    (17, 4, 4, 3, 'War Memorial Badminton/Pickleball Court A', 'One badminton/pickleball layout on the converted basketball courts.', 'Main gym, badminton/pickleball layout A', '1 hours 30 minutes', 2, 4, '2026-08-14 10:00:00', NULL),
-    (18, 4, 4, 7, 'War Memorial Table Tennis Table 1', 'Table tennis table with paddles available at the service desk.', 'Table tennis space', '1 hours', 1, 4, '2026-08-14 10:00:00', NULL),
-    (19, 4, 4, 7, 'War Memorial Table Tennis Table 2', 'Table tennis table with paddles available at the service desk.', 'Table tennis space', '1 hours', 1, 4, '2026-08-14 10:00:00', NULL),
-    (20, 4, 4, 6, 'War Memorial Yoga Studio', 'Yoga studio for small-group practice sessions.', 'Yoga studio', '1 hours 30 minutes', 3, 20, '2026-08-14 10:00:00', 5),
-    (21, 5, 5, 2, 'Squires Meeting Room A', 'Meeting room for student organization meetings, with a projector and conference seating.', 'Squires Student Center (simulated room; no official room number assigned)', '3 hours', 3, 12, '2026-08-14 14:00:00', 6),
-    (22, 5, 5, 2, 'Squires Meeting Room B', 'Larger meeting room for organization general body meetings, with a projector.', 'Squires Student Center (simulated room; no official room number assigned)', '3 hours', 3, 20, '2026-08-14 14:00:00', NULL);
+INSERT INTO "Resource" (resource_id, owner_id, building_id, category_id, name, description, location_description, max_reservation_time, required_credits, min_user_review_score, capacity, created_at, resource_image_id) VALUES
+    (1, 2, 1, 1, 'Newman Group Study Room 1', 'Small group study room with a whiteboard and table seating for four.', 'Fourth floor, group study room area', '2 hours', 2, NULL, 4, '2026-08-13 10:00:00', NULL),
+    (2, 2, 1, 1, 'Newman Group Study Room 2', 'Small group study room with a whiteboard and table seating for four.', 'Fourth floor, group study room area', '2 hours', 2, NULL, 4, '2026-08-13 10:00:00', NULL),
+    (3, 2, 1, 1, 'Newman Group Study Room 3', 'Mid-size group study room with a whiteboard and wall-mounted display.', 'Fourth floor, group study room area', '2 hours', 2, NULL, 6, '2026-08-13 10:00:00', NULL),
+    (4, 2, 1, 1, 'Newman Group Study Room 4', 'Mid-size group study room with a whiteboard and wall-mounted display.', 'Fourth floor, group study room area', '2 hours', 2, NULL, 6, '2026-08-13 10:00:00', 1),
+    (5, 2, 1, 1, 'Newman Group Study Room 5', 'Large group study room suited to project teams, with a display and two whiteboards.', 'Fourth floor, group study room area', '2 hours', 2, NULL, 8, '2026-08-13 10:00:00', NULL),
+    (6, 2, 1, 1, 'Newman Group Study Room 6', 'Large group study room suited to project teams, with a display and two whiteboards.', 'Fourth floor, group study room area', '2 hours', 2, NULL, 8, '2026-08-13 10:00:00', NULL),
+    (7, 1, 2, 2, 'Torgersen Project Room 1', 'Project room for team meetings and presentation practice.', 'Torgersen Hall (simulated room; no official room number assigned)', '3 hours', 2, NULL, 8, '2026-08-13 09:00:00', NULL),
+    (8, 1, 2, 2, 'Torgersen Project Room 2', 'Project room for team meetings and presentation practice.', 'Torgersen Hall (simulated room; no official room number assigned)', '3 hours', 2, NULL, 8, '2026-08-13 09:00:00', NULL),
+    (9, 1, 2, 1, 'Torgersen Atrium Study Table', 'Reservable table in the first-floor atrium study court with laptop power.', 'First-floor atrium (electronic study court)', '2 hours', 1, NULL, 4, '2026-08-13 09:00:00', NULL),
+    (10, 3, 3, 3, 'McComas Basketball/Volleyball Court 1', 'Full hardwood court for pickup basketball or volleyball.', 'Gymnasium level, Court 1 of 3', '2 hours', 4, 4.00, 12, '2026-08-14 09:00:00', 2),
+    (11, 3, 3, 3, 'McComas Basketball/Volleyball Court 2', 'Full hardwood court for pickup basketball or volleyball.', 'Gymnasium level, Court 2 of 3', '2 hours', 4, NULL, 12, '2026-08-14 09:00:00', NULL),
+    (12, 3, 3, 5, 'McComas Pool Lap Lane 1', 'One lap lane in the 25-yard, 8-lane pool.', 'McComas pool, Lane 1', '1 hours', 1, NULL, 2, '2026-08-14 09:00:00', 3),
+    (13, 3, 3, 6, 'McComas Multipurpose Studio', 'Open multipurpose fitness studio with mats and mirrors.', 'Multipurpose fitness studio', '1 hours 30 minutes', 3, NULL, 25, '2026-08-14 09:00:00', NULL),
+    (14, 4, 4, 4, 'War Memorial Racquetball Court 1', 'Enclosed racquetball court.', 'Racquetball court area, Court 1 of 5', '1 hours', 2, 4.50, 4, '2026-08-14 10:00:00', 4),
+    (15, 4, 4, 4, 'War Memorial Racquetball Court 2', 'Enclosed racquetball court.', 'Racquetball court area, Court 2 of 5', '1 hours', 2, NULL, 4, '2026-08-14 10:00:00', NULL),
+    (16, 4, 4, 4, 'War Memorial Squash Court', 'War Memorial Hall''s single squash court.', 'Squash court', '1 hours', 2, NULL, 4, '2026-08-14 10:00:00', NULL),
+    (17, 4, 4, 3, 'War Memorial Badminton/Pickleball Court A', 'One badminton/pickleball layout on the converted basketball courts.', 'Main gym, badminton/pickleball layout A', '1 hours 30 minutes', 2, NULL, 4, '2026-08-14 10:00:00', NULL),
+    (18, 4, 4, 7, 'War Memorial Table Tennis Table 1', 'Table tennis table with paddles available at the service desk.', 'Table tennis space', '1 hours', 1, NULL, 4, '2026-08-14 10:00:00', NULL),
+    (19, 4, 4, 7, 'War Memorial Table Tennis Table 2', 'Table tennis table with paddles available at the service desk.', 'Table tennis space', '1 hours', 1, NULL, 4, '2026-08-14 10:00:00', NULL),
+    (20, 4, 4, 6, 'War Memorial Yoga Studio', 'Yoga studio for small-group practice sessions.', 'Yoga studio', '1 hours 30 minutes', 3, 4.00, 20, '2026-08-14 10:00:00', 5),
+    (21, 5, 5, 2, 'Squires Meeting Room A', 'Meeting room for student organization meetings, with a projector and conference seating.', 'Squires Student Center (simulated room; no official room number assigned)', '3 hours', 3, 3.50, 12, '2026-08-14 14:00:00', 6),
+    (22, 5, 5, 2, 'Squires Meeting Room B', 'Larger meeting room for organization general body meetings, with a projector.', 'Squires Student Center (simulated room; no official room number assigned)', '3 hours', 3, NULL, 20, '2026-08-14 14:00:00', NULL);
 
 -- -----------------------------------------------------------------------------
 -- ResourceFeature
@@ -440,7 +440,38 @@ INSERT INTO "CreditTransaction" (transaction_id, user_id, amount, transaction_ty
 -- -----------------------------------------------------------------------------
 -- Notification
 -- -----------------------------------------------------------------------------
-INSERT INTO "Notification" (notification_id, user_id, message, notification_type, created_at) VALUES
+INSERT INTO "Notification" (
+    notification_id,
+    user_id,
+    reservation_id,
+    message,
+    notification_type,
+    created_at,
+    scheduled_for,
+    email_status,
+    email_workflow_id,
+    email_sent_at,
+    email_error
+)
+SELECT
+    notification_id,
+    user_id,
+    CASE notification_id
+        WHEN 45 THEN 10
+        WHEN 47 THEN 3
+        WHEN 59 THEN 31
+        WHEN 102 THEN 47
+        ELSE NULL
+    END AS reservation_id,
+    message,
+    notification_type,
+    created_at::timestamp,
+    created_at::timestamp AS scheduled_for,
+    'sent' AS email_status,
+    'seed-notification-' || notification_id AS email_workflow_id,
+    created_at::timestamp AS email_sent_at,
+    NULL::text AS email_error
+FROM (VALUES
     (1, 1, 'Welcome to CampusConnect! 20 credits have been added to your account.', 'account', '2026-08-10 09:00:00'),
     (2, 2, 'Welcome to CampusConnect! 20 credits have been added to your account.', 'account', '2026-08-10 10:30:00'),
     (3, 3, 'Welcome to CampusConnect! 20 credits have been added to your account.', 'account', '2026-08-11 09:15:00'),
@@ -549,13 +580,14 @@ INSERT INTO "Notification" (notification_id, user_id, message, notification_type
     (106, 18, 'Your reservation for McComas Pool Lap Lane 1 on Tue Oct 13, 7:00 AM-8:00 AM is confirmed. 1 credit deducted.', 'reservation_confirmed', '2026-10-09 21:15:00'),
     (107, 17, 'Your reservation for War Memorial Table Tennis Table 2 on Sun Oct 11, 4:00 PM-5:00 PM is confirmed. 1 credit deducted.', 'reservation_confirmed', '2026-10-10 19:15:00'),
     (108, 11, 'Your reservation for McComas Basketball/Volleyball Court 1 on Sat Oct 17, 6:00 PM-8:00 PM is confirmed. 4 credits deducted.', 'reservation_confirmed', '2026-10-10 20:00:00'),
-    (109, 8, 'Your reservation for Newman Group Study Room 5 on Thu Oct 15, 1:00 PM-3:00 PM is confirmed. 2 credits deducted.', 'reservation_confirmed', '2026-10-10 21:30:00');
+    (109, 8, 'Your reservation for Newman Group Study Room 5 on Thu Oct 15, 1:00 PM-3:00 PM is confirmed. 2 credits deducted.', 'reservation_confirmed', '2026-10-10 21:30:00')
+) AS seed(notification_id, user_id, message, notification_type, created_at);
 
 -- -----------------------------------------------------------------------------
--- ReservationReview: the reserving student reviews the resource owner.
+-- UserReview: the reserving student reviews the resource owner.
 -- Only completed reservations are reviewed; created after the reservation ends.
 -- -----------------------------------------------------------------------------
-INSERT INTO "ReservationReview" (reservation_id, reviewer_user_id, reviewee_user_id, rating, reason, created_at, is_anonymous_review) VALUES
+INSERT INTO "UserReview" (reservation_id, reviewer_user_id, reviewee_user_id, rating, reason, created_at, is_anonymous_review) VALUES
     (1, 6, 2, 5, 'Room was unlocked and ready on time. Booking was easy.', '2026-09-03 21:18:00', FALSE),
     (4, 8, 2, 5, 'Everything matched the listing.', '2026-08-27 19:00:00', FALSE),
     (6, 8, 3, 4, 'Court was set up when we arrived, but the net was not.', '2026-09-10 22:36:00', FALSE),
@@ -574,55 +606,55 @@ INSERT INTO "ReservationReview" (reservation_id, reviewer_user_id, reviewee_user
 -- -----------------------------------------------------------------------------
 -- ResourceReview: written by users who completed a reservation of that resource.
 -- -----------------------------------------------------------------------------
-INSERT INTO "ResourceReview" (review_id, resource_id, reviewer_user_id, rating, reason, created_at, is_anonymous_review) VALUES
+INSERT INTO "ResourceReview" (review_id, reservation_id, resource_id, reviewer_user_id, rating, reason, created_at, is_anonymous_review) VALUES
     -- reservation 1
-    (1, 4, 6, 5, 'Quiet room with plenty of space. Great for our group study session.', '2026-09-03 21:12:00', FALSE),
+    (1, 1, 4, 6, 5, 'Quiet room with plenty of space. Great for our group study session.', '2026-09-03 21:12:00', FALSE),
     -- reservation 4
-    (2, 2, 8, 4, 'Good room for two people working on a lab report. Whiteboard markers were running low.', '2026-08-27 19:00:00', FALSE),
+    (2, 4, 2, 8, 4, 'Good room for two people working on a lab report. Whiteboard markers were running low.', '2026-08-27 19:00:00', FALSE),
     -- reservation 5
-    (3, 9, 8, 4, 'Nice spot to study between classes. Gets a little noisy around noon.', '2026-09-04 14:00:00', FALSE),
+    (3, 5, 9, 8, 4, 'Nice spot to study between classes. Gets a little noisy around noon.', '2026-09-04 14:00:00', FALSE),
     -- reservation 6
-    (4, 10, 8, 5, 'Courts were in great shape and we had plenty of room for a full game.', '2026-09-10 22:30:00', FALSE),
+    (4, 6, 10, 8, 5, 'Courts were in great shape and we had plenty of room for a full game.', '2026-09-10 22:30:00', FALSE),
     -- reservation 7
-    (5, 14, 8, 4, 'Court was clean and the booking was easy. Lighting is a bit dim at the back.', '2026-09-25 14:00:00', FALSE),
+    (5, 7, 14, 8, 4, 'Court was clean and the booking was easy. Lighting is a bit dim at the back.', '2026-09-25 14:00:00', FALSE),
     -- reservation 8
-    (6, 20, 8, 5, 'Peaceful studio for an early morning session. Mats were clean.', '2026-10-06 13:00:00', FALSE),
+    (6, 8, 20, 8, 5, 'Peaceful studio for an early morning session. Mats were clean.', '2026-10-06 13:00:00', FALSE),
     -- reservation 11
-    (7, 12, 9, 5, 'Having a lane to myself before class was great.', '2026-09-18 10:00:00', FALSE),
+    (7, 11, 12, 9, 5, 'Having a lane to myself before class was great.', '2026-09-18 10:00:00', FALSE),
     -- reservation 12
-    (8, 16, 9, 4, 'Good court, though it was warm inside.', '2026-09-25 10:00:00', TRUE),
+    (8, 12, 16, 9, 4, 'Good court, though it was warm inside.', '2026-09-25 10:00:00', TRUE),
     -- reservation 14
-    (9, 1, 10, 5, 'Our go-to room for exam prep. The whiteboard is huge.', '2026-08-31 22:00:00', FALSE),
+    (9, 14, 1, 10, 5, 'Our go-to room for exam prep. The whiteboard is huge.', '2026-08-31 22:00:00', FALSE),
     -- reservation 15
-    (10, 1, 10, 4, 'Still a good room, but someone left trash from the earlier session.', '2026-09-16 23:00:00', FALSE),
+    (10, 15, 1, 10, 4, 'Still a good room, but someone left trash from the earlier session.', '2026-09-16 23:00:00', FALSE),
     -- reservation 17
-    (11, 10, 11, 5, 'Great for our pickup group of ten.', '2026-08-29 23:00:00', FALSE),
+    (11, 17, 10, 11, 5, 'Great for our pickup group of ten.', '2026-08-29 23:00:00', FALSE),
     -- reservation 18
-    (12, 10, 11, 4, 'Solid court. The volleyball net took a few minutes to set up.', '2026-09-13 14:00:00', FALSE),
+    (12, 18, 10, 11, 4, 'Solid court. The volleyball net took a few minutes to set up.', '2026-09-13 14:00:00', FALSE),
     -- reservation 21
-    (13, 22, 12, 5, 'Projector worked right away and the room fit our whole club.', '2026-09-09 22:30:00', FALSE),
+    (13, 21, 22, 12, 5, 'Projector worked right away and the room fit our whole club.', '2026-09-09 22:30:00', FALSE),
     -- reservation 24
-    (14, 7, 13, 4, 'Comfortable for a team meeting. Wi-Fi was a little slow.', '2026-09-08 23:00:00', FALSE),
+    (14, 24, 7, 13, 4, 'Comfortable for a team meeting. Wi-Fi was a little slow.', '2026-09-08 23:00:00', FALSE),
     -- reservation 27
-    (15, 20, 14, 5, 'Good size and nice and quiet for a morning flow.', '2026-09-06 12:30:00', FALSE),
+    (15, 27, 20, 14, 5, 'Good size and nice and quiet for a morning flow.', '2026-09-06 12:30:00', FALSE),
     -- reservation 28
-    (16, 13, 14, 3, 'Studio was fine but the sound system was not working.', '2026-09-20 16:30:00', TRUE),
+    (16, 28, 13, 14, 3, 'Studio was fine but the sound system was not working.', '2026-09-20 16:30:00', TRUE),
     -- reservation 30
-    (17, 14, 15, 4, 'Court was ready on time. Floor is a bit slippery near the door.', '2026-09-03 20:00:00', FALSE),
+    (17, 30, 14, 15, 4, 'Court was ready on time. Floor is a bit slippery near the door.', '2026-09-03 20:00:00', FALSE),
     -- reservation 33
-    (18, 6, 16, 5, 'Two large whiteboards made planning our project so much easier.', '2026-09-14 16:30:00', FALSE),
+    (18, 33, 6, 16, 5, 'Two large whiteboards made planning our project so much easier.', '2026-09-14 16:30:00', FALSE),
     -- reservation 36
-    (19, 17, 17, 4, 'Fun court for doubles. Wish the nets were a little taller.', '2026-09-13 15:30:00', FALSE),
+    (19, 36, 17, 17, 4, 'Fun court for doubles. Wish the nets were a little taller.', '2026-09-13 15:30:00', FALSE),
     -- reservation 39
-    (20, 12, 18, 5, 'Lane was always open when I arrived. Very easy to use.', '2026-09-08 09:00:00', FALSE),
+    (20, 39, 12, 18, 5, 'Lane was always open when I arrived. Very easy to use.', '2026-09-08 09:00:00', FALSE),
     -- reservation 43
-    (21, 16, 19, 4, 'Good court for a quick match after class.', '2026-09-10 21:00:00', FALSE),
+    (21, 43, 16, 19, 4, 'Good court for a quick match after class.', '2026-09-10 21:00:00', FALSE),
     -- reservation 45
-    (22, 3, 20, 5, 'The display made it easy for our group to review slides together.', '2026-09-17 15:00:00', FALSE),
+    (22, 45, 3, 20, 5, 'The display made it easy for our group to review slides together.', '2026-09-17 15:00:00', FALSE),
     -- reservation 50
-    (23, 8, 22, 5, 'Plenty of room for our whole design team.', '2026-09-23 23:00:00', FALSE),
+    (23, 50, 8, 22, 5, 'Plenty of room for our whole design team.', '2026-09-23 23:00:00', FALSE),
     -- reservation 55
-    (24, 18, 24, 4, 'Quick, easy game during lunch. Paddles were a little worn.', '2026-10-09 14:00:00', FALSE);
+    (24, 55, 18, 24, 4, 'Quick, easy game during lunch. Paddles were a little worn.', '2026-10-09 14:00:00', FALSE);
 
 -- -----------------------------------------------------------------------------
 -- Session (synthetic SHA-256 token hashes; sessions last 7 days)
@@ -662,7 +694,7 @@ INSERT INTO "Session" (session_id, user_id, token_hash, created_at, expires_at) 
 
 -- -----------------------------------------------------------------------------
 -- Advance identity sequences past the explicit IDs used above.
--- (reservationreview has no identity column: its PK is reservation_id.)
+-- (userreview has no identity column: its PK is reservation_id.)
 -- -----------------------------------------------------------------------------
 DO $$
 BEGIN

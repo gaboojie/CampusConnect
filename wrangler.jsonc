@@ -18,7 +18,8 @@
 			"workers_dev": false,
 			"vars": {
 				"APP_ENV": "dev",
-				"PUBLIC_APP_ORIGIN": "http://localhost:8787"
+				"PUBLIC_APP_ORIGIN": "http://localhost:8787",
+				"GOOGLE_MAPS_MAP_ID": "DEMO_MAP_ID"
 			},
 			"r2_buckets": [
 				{
@@ -30,7 +31,22 @@
 			"secrets": {
 				"required": [
 					"RESEND_API_KEY",
-					"RESEND_FROM_EMAIL"
+					"RESEND_FROM_EMAIL",
+					"GOOGLE_MAPS_JAVASCRIPT_API_KEY",
+					"GOOGLE_PLACES_API_KEY"
+				]
+			},
+			"workflows": [
+				{
+					"binding": "NOTIFICATION_WORKFLOW",
+					"name": "campusconnect-dev-notification-email",
+					"class_name": "NotificationWorkflow"
+				}
+			],
+			"triggers": {
+				"crons": [
+					"*/15 * * * *",
+					"0 6 * * *"
 				]
 			},
 			"hyperdrive": [
@@ -45,7 +61,8 @@
 			"workers_dev": true,
 			"vars": {
 				"APP_ENV": "production",
-				"PUBLIC_APP_ORIGIN": "https://campusconnect-production.vt-campusconnect.workers.dev"
+				"PUBLIC_APP_ORIGIN": "https://campusconnect-production.vt-campusconnect.workers.dev",
+				"GOOGLE_MAPS_MAP_ID": "DEMO_MAP_ID"
 			},
 			"r2_buckets": [
 				{
@@ -62,9 +79,18 @@
 			"secrets": {
 				"required": [
 					"RESEND_API_KEY",
-					"RESEND_FROM_EMAIL"
+					"RESEND_FROM_EMAIL",
+					"GOOGLE_MAPS_JAVASCRIPT_API_KEY",
+					"GOOGLE_PLACES_API_KEY"
 				]
 			},
+			"workflows": [
+				{
+					"binding": "NOTIFICATION_WORKFLOW",
+					"name": "campusconnect-production-notification-email",
+					"class_name": "NotificationWorkflow"
+				}
+			],
 			"hyperdrive": [
 				{
 					"binding": "DB",

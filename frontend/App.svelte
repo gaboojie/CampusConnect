@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import AppLayout from './components/AppLayout.svelte'
-  import AdminLayout from './components/AdminLayout.svelte'
+  import NotificationBell from './components/NotificationBell.svelte'
   import ProfileMenu from './components/ProfileMenu.svelte'
   import { isAdminPath } from './lib/adminRoutes'
   import type { PublicUser } from './lib/types'
@@ -29,9 +29,7 @@
   let signupEmail = ''
   let signupPassword = ''
   let signupConfirmPassword = ''
-  let signupPhoneNumber = ''
   let signupEmailNotifications = true
-  let signupTextNotifications = false
   let resendEmail = ''
 
   function clearFeedback() {
@@ -88,6 +86,7 @@
 
       if (response.ok && payload.user) {
         user = payload.user
+        if (onAdminPath) clearAppRouteHash()
       } else if (response.status === 401) {
         user = null
       } else {
@@ -118,6 +117,7 @@
       }
 
       user = payload.user
+      clearAppRouteHash()
       loginPassword = ''
       message = 'You are signed in.'
     } catch {
@@ -140,9 +140,7 @@
           email: signupEmail,
           password: signupPassword,
           confirmPassword: signupConfirmPassword,
-          phoneNumber: signupPhoneNumber,
           emailNotificationsOn: signupEmailNotifications,
-          textNotificationsOn: signupTextNotifications,
         }),
       })
       const payload = await responsePayload(response)
@@ -243,6 +241,16 @@
     }
   }
 
+  function handleUserUpdated(updatedUser: PublicUser) {
+    user = updatedUser
+  }
+
+  function handleAccountDeleted() {
+    user = null
+    clearAppRouteHash()
+    message = 'Your account has been deleted.'
+  }
+
   onMount(() => {
     verificationToken = readVerificationToken()
     return loadCurrentUser()
@@ -258,7 +266,10 @@
   <header class="site-header">
     <a class="brand" href="/" aria-label="CampusConnect home">Campus Connect</a>
     {#if user}
-      <ProfileMenu {user} {submitting} onLogout={logout} />
+      <div class="header-actions">
+        {#if !user.isBanned}<NotificationBell />{/if}
+        <ProfileMenu {user} {submitting} onLogout={logout} />
+      </div>
     {:else}
       <div class="account-indicator" aria-label="Not signed in">
         <svg class="user-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -286,11 +297,7 @@
         <p>Checking your session…</p>
       </section>
     {:else if user}
-      {#if onAdminPath}
-        <AdminLayout {user} />
-      {:else}
-        <AppLayout {user} {submitting} onLogout={logout} />
-      {/if}
+      <AppLayout {user} {submitting} onLogout={logout} onAccountDeleted={handleAccountDeleted} onUserUpdated={handleUserUpdated} />
     {:else if verificationToken}
       <section class="panel verification-card">
         <p class="eyebrow">One last step</p>
@@ -392,24 +399,19 @@
           <input type="password" bind:value={signupConfirmPassword} autocomplete="new-password" required />
           {#if fieldErrors.confirmPassword}<span class="field-error">{fieldErrors.confirmPassword}</span>{/if}
         </label>
-        <label>
-          Phone number <span class="optional">optional</span>
-          <input type="tel" bind:value={signupPhoneNumber} autocomplete="tel" maxlength="16" />
-          {#if fieldErrors.phoneNumber}<span class="field-error">{fieldErrors.phoneNumber}</span>{/if}
-        </label>
-
         <fieldset class="notification-options">
           <legend>Notifications</legend>
-          <p class="checkbox-help">Choose how you would like to hear about reservations and important account updates.</p>
-          <label class="checkbox-label">
-            <input type="checkbox" bind:checked={signupEmailNotifications} />
+          <p class="checkbox-help">Choose whether you would like to receive reservation and account updates by email.</p>
+          <label class="toggle-label">
+            <input class="toggle-input" type="checkbox" bind:checked={signupEmailNotifications} />
+            <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
             <span>Email notifications</span>
           </label>
-          <label class="checkbox-label">
-            <input type="checkbox" bind:checked={signupTextNotifications} disabled={!signupPhoneNumber.trim()} />
-            <span>SMS notifications <span class="optional">requires a phone number</span></span>
-          </label>
         </fieldset>
+
+        {#if error}
+          <p class="notice error-notice" role="alert">{error}</p>
+        {/if}
 
         <button type="submit" disabled={submitting}>
           {submitting ? 'Creating account…' : 'Create account'}

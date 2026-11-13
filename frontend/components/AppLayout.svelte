@@ -1,20 +1,33 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import Sidebar from './Sidebar.svelte'
+  import ActivitySection from './sections/ActivitySection.svelte'
+  import AdminBuildingsSection from './sections/AdminBuildingsSection.svelte'
+  import AdminOverviewSection from './sections/AdminOverviewSection.svelte'
+  import AdminReservationsSection from './sections/AdminReservationsSection.svelte'
+  import AdminResourcesSection from './sections/AdminResourcesSection.svelte'
+  import AdminUserDetailSection from './sections/AdminUserDetailSection.svelte'
+  import AdminUsersSection from './sections/AdminUsersSection.svelte'
   import AnnouncementsSection from './sections/AnnouncementsSection.svelte'
+  import CreditsSection from './sections/CreditsSection.svelte'
   import ListingsSection from './sections/ListingsSection.svelte'
-  import ListingDetailSection from './sections/ListingDetailSection.svelte'
+  import MapsSection from './sections/MapsSection.svelte'
   import PlaceholderSection from './sections/PlaceholderSection.svelte'
   import ProfileSection from './sections/ProfileSection.svelte'
   import ReservationsSection from './sections/ReservationsSection.svelte'
   import ResourceDetailSection from './sections/ResourceDetailSection.svelte'
   import ResourcesSection from './sections/ResourcesSection.svelte'
+  import UserProfileSection from './sections/UserProfileSection.svelte'
   import { DEFAULT_ROUTE, locationHash, parseLocation, routes, type AppLocation } from '../lib/routes'
-  import type { PublicUser } from '../lib/types'
+  import type { PublicUser, ResourceReviewWarning } from '../lib/types'
 
   export let user: PublicUser
   export let submitting: boolean
   export let onLogout: () => void
+  export let onAccountDeleted: () => void
+  export let onUserUpdated: (user: PublicUser) => void
+
+  let resourceReviewWarning: ResourceReviewWarning | null = null
 
   const COLLAPSED_STORAGE_KEY = 'campusconnect.sidebarCollapsed'
 
@@ -48,6 +61,7 @@
     const previous = location
     location = parseLocation(window.location.hash)
     drawerOpen = false
+    resourceReviewWarning = null
 
     // Moving between pages (not just filter changes) starts at the top.
     if (previous.route.id !== location.route.id || previous.subpath !== location.subpath) {
@@ -68,19 +82,29 @@
 
   onMount(syncRoute)
 
-  $: route = location.route
+  $: route = user.isBanned ? routes[0] : location.route
+  $: visibleRoutes = user.isBanned
+    ? routes.filter((candidate) => candidate.id === 'profile')
+    : routes.filter((candidate) => !candidate.hidden && (!candidate.adminOnly || user.role === 'admin'))
 </script>
 
 <svelte:window on:hashchange={syncRoute} on:keydown={handleKeydown} />
 
 <div class="app-layout" class:sidebar-collapsed={collapsed} class:drawer-open={drawerOpen}>
-  <Sidebar {routes} currentId={route.id} {collapsed} onToggle={toggleCollapsed} onNavigate={closeDrawer} />
+  <Sidebar
+    routes={visibleRoutes}
+    currentId={route.id}
+    isAdmin={user.role === 'admin'}
+    {collapsed}
+    onToggle={toggleCollapsed}
+    onNavigate={closeDrawer}
+  />
 
   {#if drawerOpen}
     <button type="button" class="drawer-backdrop" aria-label="Close navigation" on:click={closeDrawer}></button>
   {/if}
 
-  <div class="app-main">
+  <div class="app-main" class:map-app-main={route.id === 'maps'}>
     <div class="mobile-bar">
       <button
         type="button"
@@ -97,20 +121,69 @@
       <span class="mobile-bar-title">{route.label}</span>
     </div>
 
-    {#if route.id === 'profile'}
-      <ProfileSection {user} {submitting} {onLogout} />
+    {#if resourceReviewWarning}
+      <div class="resource-review-warning" role="alert">
+        <div class="resource-review-warning-icon" aria-hidden="true">!</div>
+        <div>
+          <strong>Reservation unavailable</strong>
+          <p>
+            This resource requires an average user rating of
+            <strong>{resourceReviewWarning.minUserReviewScore.toFixed(2)} / 5.00</strong>.
+            Your rating:
+            <strong>
+              {resourceReviewWarning.viewerReviewScore === null
+                ? 'No reviews yet'
+                : `${resourceReviewWarning.viewerReviewScore.toFixed(2)} / 5.00`}
+            </strong>.
+            You cannot reserve it until you meet the minimum.
+          </p>
+        </div>
+      </div>
+    {/if}
+
+    {#if user.isBanned || route.id === 'profile'}
+      <ProfileSection {user} {submitting} {onLogout} {onAccountDeleted} {onUserUpdated} />
+    {:else if route.id === 'admin-overview'}
+      <AdminOverviewSection />
+    {:else if route.id === 'admin-users' && location.subpath}
+      {#key location.subpath}
+        <AdminUserDetailSection userId={location.subpath} currentUserId={user.userId} />
+      {/key}
+    {:else if route.id === 'admin-users'}
+      <AdminUsersSection currentUserId={user.userId} />
+    {:else if route.id === 'admin-reservations'}
+      <AdminReservationsSection />
+    {:else if route.id === 'admin-resources'}
+      <AdminResourcesSection />
+    {:else if route.id === 'admin-buildings'}
+      <AdminBuildingsSection />
+    {:else if route.id === 'users' && location.subpath}
+      <UserProfileSection userId={location.subpath} />
     {:else if route.id === 'resources' && location.subpath}
-      <ResourceDetailSection resourceId={location.subpath} backQuery={location.query} />
+      <ResourceDetailSection
+        resourceId={location.subpath}
+        backQuery={location.query}
+        origin="resources"
+        {user}
+        {onUserUpdated}
+        onResourceWarningChange={(warning) => resourceReviewWarning = warning}
+      />
     {:else if route.id === 'resources'}
       <ResourcesSection query={location.query} />
+    {:else if route.id === 'maps'}
+      <MapsSection />
     {:else if route.id === 'listings' && location.subpath}
-      <ListingDetailSection listingId={location.subpath} {user} />
+      <ResourceDetailSection resourceId={location.subpath} origin="listings" {user} onUserUpdated={onUserUpdated} onResourceWarningChange={(warning) => resourceReviewWarning = warning} />
     {:else if route.id === 'listings'}
       <ListingsSection {user} />
     {:else if route.id === 'reservations'}
-      <ReservationsSection />
+      <ReservationsSection {user} {onUserUpdated} />
+    {:else if route.id === 'credits'}
+      <CreditsSection {user} {onUserUpdated} />
+    {:else if route.id === 'activity'}
+      <ActivitySection />
     {:else if route.id === 'announcements'}
-      <AnnouncementsSection />
+      <AnnouncementsSection query={location.query} />
     {:else}
       <PlaceholderSection {route} />
     {/if}

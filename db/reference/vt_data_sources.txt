@@ -139,7 +139,6 @@ Users ("user"), all SIMULATED:
   - Usernames are fictional (e.g. maya_r, recsports_mccomas_tj) and do not
     identify real people.
   - Emails use the reserved example.com domain (RFC 2606).
-  - Phone numbers use the fictional +1-540-555-0100..0199 range.
   - Roles: 'admin' (1), 'staff' (4, the resource owners), 'student' (20).
   - ryan_f is suspended (is_banned = TRUE) after two no-shows.
   - sam_q joined on 2026-10-09 and has no reservations yet.
@@ -159,11 +158,10 @@ The Phase 3 documentation defines credit columns but no credit, refund, or
 cancellation policy. seed.sql uses these ASSUMED rules:
 
   a. New account: +20 credits (transaction_type 'initial_grant').
-  b. Monthly reset on the 1st at 00:00: the balance returns to 20 and
-     unused credits do not roll over. A 'monthly_reset' row stores the
-     top-up amount and is only written when the balance changes;
-     credit_last_reset is still updated. Suspended accounts do not
-     receive resets.
+  b. Every 30 days since the last credit grant, active accounts receive an
+     additive 20-credit 'monthly_reset'. Existing credits are not discarded
+     or capped at 20. Suspended accounts do not receive resets. If the daily
+     sweep is late, it catches up every completed 30-day period.
   c. Booking deducts the resource's required_credits once, as a flat
      charge per reservation, not per hour ('reservation_charge').
   d. A user who cancels at least 24 hours before the start gets a full
@@ -210,7 +208,7 @@ The four main journeys:
 Reviews:
   - ResourceReview: written only by users who completed a reservation of
     that resource, after it ended.
-  - ReservationReview: only for completed reservations. The reserving
+  - UserReview: only for completed reservations. The reserving
     student is the reviewer and the resource owner is the reviewee
     (ASSUMPTION; see section 7).
   - All review text is fictional.
@@ -231,10 +229,10 @@ message text.
 ---------------------------------
 - Credit, refund, and cancellation rules (section 5) are not in the
   Phase 3 documents and need team confirmation.
-- ReservationReview direction: the schema stores one reviewer and one
+- UserReview direction: the schema stores one reviewer and one
   reviewee per reservation but does not say who reviews whom. We chose
   reserving student -> resource owner. The schema allows only one
-  ReservationReview per reservation, so two-way reviews are impossible.
+  UserReview per reservation, so two-way reviews are impossible.
 - Allowed values of role, reservation status, image status,
   transaction_type, and notification_type are not documented. The values
   used here are our choices.

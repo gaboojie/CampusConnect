@@ -1,4 +1,4 @@
-export type AdminRouteId = 'overview' | 'users' | 'reservations' | 'resources'
+export type AdminRouteId = 'overview' | 'users' | 'reservations' | 'resources' | 'buildings'
 
 export type AdminRoute = {
   id: AdminRouteId
@@ -39,9 +39,23 @@ export const adminRoutes: AdminRoute[] = [
     description: 'Review and manage every listed resource.',
     icon: ['M4 4h7.5l8.5 8.5-7.5 7.5L4 11.5Z', 'M8.5 8.5h.01'],
   },
+  {
+    id: 'buildings',
+    label: 'Buildings',
+    description: 'Add, update, and remove campus buildings.',
+    icon: ['M4 20h16', 'M6 20V9l6-5 6 5v11', 'M10 20v-6h4v6'],
+  },
 ]
 
 export const DEFAULT_ADMIN_ROUTE = adminRoutes[0]
+
+const MAIN_APP_ADMIN_ROUTES: Record<AdminRouteId, string> = {
+  overview: 'admin-overview',
+  users: 'admin-users',
+  reservations: 'admin-reservations',
+  resources: 'admin-resources',
+  buildings: 'admin-buildings',
+}
 
 export type AdminLocation = {
   route: AdminRoute
@@ -50,7 +64,8 @@ export type AdminLocation = {
 }
 
 export function adminHash(id: string): string {
-  return `#/${id}`
+  const mainAppRoute = MAIN_APP_ADMIN_ROUTES[id as AdminRouteId]
+  return `#/${mainAppRoute ?? id}`
 }
 
 export function isAdminPath(pathname: string): boolean {

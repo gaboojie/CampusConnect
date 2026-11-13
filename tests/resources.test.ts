@@ -23,6 +23,7 @@ const summaryRow = {
 
 const detailRow = {
   resource_id: 22,
+  is_owner: false,
   name: "Squires Meeting Room B",
   description: "Larger meeting room for organization general body meetings, with a projector.",
   location_description: "Squires Student Center",
@@ -43,6 +44,9 @@ const detailRow = {
   image_alt_text: null,
   average_rating: null,
   review_count: 0,
+  min_user_review_score: 4.5,
+  viewer_review_score: 4.25,
+  viewer_review_count: 2,
 };
 
 function setup(database = new FakeReadDatabase()) {
@@ -168,6 +172,7 @@ describe("resource search SQL", () => {
     expect(text).toContain("rv.status <> 'cancelled'");
     expect(text).toContain("rv.start_time < $3::timestamp AND rv.end_time > $2::timestamp");
     expect(text).toContain("mp.start_time < $3::timestamp AND mp.end_time > $2::timestamp");
+    expect(text).toContain("mp.start_time <= (now() AT TIME ZONE 'America/New_York')");
   });
 
   it.each([
@@ -221,9 +226,40 @@ describe("GET /api/resources", () => {
       limit: 1,
       offset: 3,
     });
+
     expect(database.queries).toHaveLength(2);
     expect(database.queries[1].values).toEqual([1, 1, 3]);
     expectReadOnly(database.queries);
+  });
+
+  it("scopes resource results to the selected building", async () => {
+    const database = new FakeReadDatabase()
+      .respond("SELECT COUNT(*)", [{ total: 1 }])
+      .respond("SELECT r.resource_id, r.name, r.description, r.capacity", [summaryRow]);
+    const { get } = setup(database);
+
+    const response = await get("/api/resources?building=5&limit=50");
+
+    expect(response.status).toBe(200);
+    expect(database.queries[0].values).toEqual([5]);
+    expect(database.queries[1].values).toEqual([5, 50, 0]);
+    expectReadOnly(database.queries);
+  });
+
+  it("marks resources that are currently under maintenance", async () => {
+    const database = new FakeReadDatabase()
+      .respond("SELECT COUNT(*)", [{ total: 1 }])
+      .respond("SELECT r.resource_id, r.name, r.description, r.capacity", [{
+        ...summaryRow,
+        is_under_maintenance: true,
+      }]);
+    const { get } = setup(database);
+
+    const response = await get("/api/resources");
+
+    expect(response.status).toBe(200);
+    const payload = await response.json() as { resources: Array<{ isUnderMaintenance?: boolean }> };
+    expect(payload.resources[0].isUnderMaintenance).toBe(true);
   });
 
   it("rejects invalid filters before touching the database", async () => {
@@ -272,10 +308,10 @@ describe("GET /api/resources/filters", () => {
 });
 
 describe("GET /api/resources/:id", () => {
-  function detailDatabase() {
+  function detailDatabase(row = detailRow) {
     return new FakeReadDatabase()
       .respond("SELECT r.resource_id, r.name, r.description, r.location_description", (values) =>
-        values[0] === 22 ? [detailRow] : [],
+        values[0] === 22 ? [row] : [],
       )
       .respond("SELECT feature_name, description", [
         { feature_name: "Microphone", description: "Wireless microphone." },
@@ -315,6 +351,9 @@ describe("GET /api/resources/:id", () => {
       maxReservationMinutes: 180,
       averageRating: null,
       reviewCount: 0,
+      minUserReviewScore: 4.5,
+      viewerReviewScore: 4.25,
+      viewerReviewCount: 2,
       features: [{ name: "Microphone", description: "Wireless microphone." }],
       weeklyHours: [
         { date: "2026-10-17", weekday: "Saturday", windows: [] },
@@ -324,12 +363,25 @@ describe("GET /api/resources/:id", () => {
         { id: 6, startTime: "2026-10-20T09:00:00", endTime: "2026-10-20T21:00:00", reason: "Projector replacement." },
       ],
       images: [{ id: 6, altText: null, url: "/api/resource-images/6" }],
+      isOwner: false,
       recentReviews: [
         { id: 8, rating: 4, reason: "Warm inside.", createdAt: "2026-09-25T10:00:00", reviewerUsername: null },
       ],
     });
-    expect(database.queries.every((query) => query.values.length === 1 && query.values[0] === 22)).toBe(true);
+    expect(database.queries[0].values).toEqual([22, 6]);
+    expect(database.queries.slice(1).every((query) => query.values.length === 1 && query.values[0] === 22)).toBe(true);
     expectReadOnly(database.queries);
+  });
+
+  it("marks the current user as the owner when the resource belongs to them", async () => {
+    const database = detailDatabase({ ...detailRow, is_owner: true });
+    const { get } = setup(database);
+
+    const response = await get("/api/resources/22");
+
+    expect(response.status).toBe(200);
+    const { resource } = (await response.json()) as { resource: { isOwner: boolean } };
+    expect(resource.isOwner).toBe(true);
   });
 
   it("hides anonymous reviewers in SQL", async () => {

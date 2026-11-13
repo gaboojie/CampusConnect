@@ -7,7 +7,6 @@ const userRow = {
   user_id: 7,
   username: "alex_k",
   email: "alex.k@vt.edu",
-  phone_number: "5405550101",
   role: "student",
   created_at: "2026-08-24T10:00:00Z",
   email_verified_at: "2026-08-24T10:05:00Z",
@@ -16,7 +15,6 @@ const userRow = {
   is_banned: false,
   can_add_resources: false,
   email_notifications_on: true,
-  text_notifications_on: false,
   total: "31",
 };
 
@@ -125,7 +123,11 @@ describe("GET /api/admin/stats", () => {
       .respond("SELECT COUNT(*) AS total", [{ total: "10", verified: "8", unverified: "2", banned: "1" }])
       .respond("SELECT role, COUNT(*)", [{ role: "admin", count: "1" }, { role: "student", count: "9" }])
       .respond('SELECT COUNT(*) AS count FROM "Resource"', [{ count: "22" }])
-      .respond("SELECT status, COUNT(*)", [{ status: "confirmed", count: "4" }, { status: "cancelled", count: "1" }]);
+      .respond("SELECT status, COUNT(*)", [{ status: "confirmed", count: "4" }, { status: "cancelled", count: "1" }])
+      .respond("SELECT to_char(d.day", [
+        { day: "2026-11-06", reservations: "3", signups: "0" },
+        { day: "2026-11-07", reservations: "2", signups: "1" },
+      ]);
 
     const response = await get("/api/admin/stats");
     expect(await response.json()).toEqual({
@@ -133,6 +135,10 @@ describe("GET /api/admin/stats", () => {
         users: { total: 10, verified: 8, unverified: 2, banned: 1, byRole: { admin: 1, student: 9 } },
         resources: { total: 22 },
         reservations: { total: 5, byStatus: { confirmed: 4, cancelled: 1 } },
+        activity: [
+          { date: "2026-11-06", reservations: 3, signups: 0 },
+          { date: "2026-11-07", reservations: 2, signups: 1 },
+        ],
       },
     });
   });
