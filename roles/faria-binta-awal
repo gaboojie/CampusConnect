@@ -1,0 +1,9 @@
+Faria Binta Awal:
+
+Sidebar Navigation: Built the initial application layout, sidebar, and navigation system. Added support for switching between pages, highlighting the active page, and a collapsible sidebar.
+Resource Browsing and Filtering: Implemented backend APIs and frontend functionality for browsing, searching, sorting, and filtering resources by category, building, capacity, features, and availability. Added pagination and URL-based filters.
+Resource Detail View: Developed the initial resource detail page and API to display resource information, including its location, features, ratings, reviews, and maintenance schedules.
+Database Locking and Concurrency: Implemented transaction-based row locking using SELECT FOR UPDATE and SELECT FOR NO KEY UPDATE to prevent simultaneous conflicting reservations and double bookings. Added consistent locking order and transaction handling to maintain database consistency.
+User Analytical Dashboard: Developed the My Activity dashboard, displaying reservation statistics, monthly activity trends, category distributions, reservation outcomes, and frequently reserved resources. Implemented authenticated SQL aggregation queries, backend APIs, frontend visualizations, and automated tests.
+Credit Transactions: Implemented credit deductions for reservations, eligible cancellation refunds, and transaction history using the existing database schema. Developed the My Credits page, integrated credit information into reservation workflows, and added tests for transactional consistency and concurrency.
+Report Writing and Review: Completed Sections 1, 3, 5, and 8 in this report. Also worked and reviewed on Section 2 and Section 7 in Project Phase 5.
