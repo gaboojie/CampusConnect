@@ -30,6 +30,7 @@ describe("application routes", () => {
       "Users",
       "Reservations",
       "Resources",
+      "Buildings",
     ]);
 
     const location = parseLocation("#/admin-users/42");
