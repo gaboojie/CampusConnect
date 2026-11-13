@@ -1,0 +1,52 @@
+Rokeshuvaraj Nagarajan: 
+
+Main area: the admin panel, plus the availability calendar, in-app notifications, and sign-in lockout.
+Branch: rokesh/admin-panel. Buildings: rokesh/admin-buildings, merged into main and pushed to dev.
+Admin panel (/admin, admins only)
+The first version was committed in October 2026 (Add an admin panel for users, reservations, and account overview). I then extended it into a full management console.
+Overview
+•	Stat cards, a 14-day activity chart (new reservations and sign-ups), and pie charts for reservations by status and users by role. The charts are plain SVG and CSS, with no chart library.
+•	Account-health bars (verified, unverified, banned, and so on).
+•	Files: frontend/components/sections/AdminOverviewSection.svelte, AdminActivityChart.svelte, PieChart.svelte, BarList.svelte. The data comes from getStats in db/repositories/admin.ts.
+Users
+•	List with search, role and status filters, and paging. Accounts that were deleted are hidden.
+•	Create a user (@vt.edu addresses only, with a starting credit grant).
+•	Edit a user's username, email, role, and settings.
+•	Ban and unban, with a confirmation popup.
+•	Promote a user to admin or remove admin, with a confirmation popup.
+•	Delete an account (soft delete) after typing the username to confirm.
+•	Icon buttons for the row actions.
+•	Safety rules enforced by the server: an admin cannot ban, demote, or delete their own account, and deleted accounts cannot be edited.
+•	Files: AdminUsersSection.svelte, AdminUserDetailSection.svelte, AdminCreateUserForm.svelte, ConfirmDialog.svelte. API routes: POST/PATCH/DELETE /api/admin/users in backend/index.ts, backed by createUser, updateUser, and deleteUserAccount in db/repositories/admin.ts.
+Resources
+•	Table with search, showing a few columns. Clicking a row opens a details dialog with the remaining information.
+•	Delete with a confirmation popup. Deleting a resource cancels its upcoming reservations, refunds the credits, and sends the affected users a cancellation notice. It is refused while a reservation is in progress, and its images are removed from R2.
+•	Files: AdminResourcesSection.svelte, AdminResourceDetailsDialog.svelte. API routes: GET /api/admin/resources, GET /api/admin/resources/:id, and DELETE /api/admin/resources/:id.
+Reservations
+•	A calendar view and a list view of every reservation. See the availability calendar below.
+•	File: AdminReservationsSection.svelte.
+Buildings
+•	A Buildings item in the admin sidebar. The table shows each building name and address, with search and paging.
+•	Add a building with a name, address, latitude, and longitude. The Google place id is optional.
+•	Update the name, address, coordinates, and Google place id.
+•	Delete with a confirmation popup. Delete is refused while the building still has resources. No new table or column was added; the existing Building table is used.
+•	Files: AdminBuildingsSection.svelte, AdminBuildingForm.svelte. API routes: GET /api/admin/buildings, POST /api/admin/buildings, PATCH /api/admin/buildings/:id, and DELETE /api/admin/buildings/:id, backed by listAdminBuildings, createBuilding, updateBuilding, and deleteBuilding in db/repositories/admin.ts. Branch: rokesh/admin-buildings, merged into main and pushed to dev.
+Availability calendar
+•	Backend: GET /api/calendar (db/repositories/calendar.ts). It returns each resource's opening windows (including repeating weekly and daily windows), bookings, and maintenance for one day. Everyone signed in can see which slots are taken, but only admins get the booker's name and reservation id.
+•	Frontend: a day grid of half-hour slots (DayGrid.svelte, AvailabilityCalendar.svelte, frontend/lib/calendar.ts). Available, booked, own, maintenance, and closed slots are colored differently.
+•	Admin Reservations page: a Calendar tab, where clicking a booking shows who booked it, plus a List tab.
+•	Each resource page: its own availability calendar. Clicking an available slot opens the reservation form with up to two hours filled in. The suggestion stops at the next booking, maintenance, or closing time, and the form says why it is shorter.
+Notifications
+•	Backend: GET /api/notifications, POST /api/notifications/:id/read, and POST /api/notifications/read-all (db/repositories/inbox.ts). A notification appears once it is due, and reminders for reservations that were cancelled are hidden. Users can only read and change their own.
+•	Frontend: a bell in the top bar (NotificationBell.svelte) with an unread count that refreshes automatically. It opens a dropdown with All and Unread tabs, "Mark as read", "Mark all as read", and "Show more".
+•	Database: migration db/migrations/003_notification_read.sql adds "Notification".read_at.
+Sign-in lockout
+•	After five wrong passwords in a row, an account is locked for five minutes. The sign-in form shows "Please wait N minutes before trying again", and the server answers 429 with a Retry-After header.
+•	The failure count is updated in one atomic SQL statement, so parallel guesses cannot get past the limit. A successful sign-in resets the count.
+•	Files: recordFailedLogin, clearFailedLogins, and findLoginUser in db/repositories/auth.ts, and the login route in backend/index.ts. Migration: db/migrations/004_login_lockout.sql.
+Other
+•	Showed field errors on the create-account form (Show signup errors on the create-account form).
+•	Updated the README (features list, project structure, migrations, and authentication sections) and docs/architecture.md to match the current layout.
+Testing
+•	Added backend tests: tests/admin-manage.test.ts, tests/admin-buildings.test.ts, tests/calendar.test.ts, tests/notification-inbox.test.ts, and sign-in lockout cases in tests/auth.test.ts. The stats test in tests/admin.test.ts was updated too.
+•	Ran the new SQL (the admin queries, calendar, notifications inbox, and lockout) against a temporary local PostgreSQL database with the project schema and checked the results.

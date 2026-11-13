@@ -20,6 +20,7 @@
     "migrate:dev": "tsx db/scripts/migrate.ts --environment dev",
     "migrate:prod": "tsx db/scripts/migrate.ts --environment prod",
     "admin:command": "tsx db/scripts/admin-command.ts",
+    "verify:user-email": "tsx db/scripts/verify-user-email.ts",
     "db:reset": "tsx db/scripts/reset-database.ts"
   },
   "devDependencies": {
