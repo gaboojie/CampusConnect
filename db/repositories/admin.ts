@@ -896,3 +896,215 @@ export async function deleteResource(
     throw error;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Building management. The Building table already stores every field an admin
+// can change, so these writes do not add columns.
+// ---------------------------------------------------------------------------
+
+const BUILDING_NAME_MAX = 120;
+const BUILDING_ADDRESS_MAX = 200;
+const BUILDING_PLACE_ID_MAX = 255;
+
+export type AdminBuildingQuery = PageQuery & { search: string };
+
+export type AdminBuilding = {
+  id: number;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  googlePlaceId: string | null;
+  resourceCount: number;
+};
+
+export type AdminBuildingInput = {
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  googlePlaceId: string | null;
+};
+
+type BuildingRow = {
+  building_id: number;
+  building_name: string;
+  address: string;
+  latitude: string | number;
+  longitude: string | number;
+  google_place_id: string | null;
+  resource_count: string | number;
+};
+
+function mapBuilding(row: BuildingRow): AdminBuilding {
+  return {
+    id: row.building_id,
+    name: row.building_name,
+    address: row.address,
+    latitude: Number(row.latitude),
+    longitude: Number(row.longitude),
+    googlePlaceId: row.google_place_id,
+    resourceCount: Number(row.resource_count),
+  };
+}
+
+function parseCoordinate(
+  value: unknown,
+  field: "latitude" | "longitude",
+  min: number,
+  max: number,
+  errors: Record<string, string>,
+): number | undefined {
+  const numeric = typeof value === "number"
+    ? value
+    : typeof value === "string" && value.trim() !== ""
+      ? Number(value.trim())
+      : Number.NaN;
+
+  if (!Number.isFinite(numeric) || numeric < min || numeric > max) {
+    errors[field] = field === "latitude"
+      ? "Latitude must be a number from -90 to 90."
+      : "Longitude must be a number from -180 to 180.";
+    return undefined;
+  }
+
+  return Math.round(numeric * 1_000_000) / 1_000_000;
+}
+
+export function parseAdminBuildingQuery(params: URLSearchParams): Validation<AdminBuildingQuery> {
+  const page = parsePage(params);
+  if (!page.ok) return page;
+  return {
+    ok: true,
+    value: { ...page.value, search: (params.get("search") ?? "").trim().slice(0, 100) },
+  };
+}
+
+export function parseAdminBuilding(body: unknown): FieldValidation<AdminBuildingInput> {
+  const values = asRecord(body);
+  if (!values) return { ok: false, fieldErrors: { form: "Enter the building details." } };
+
+  const errors: Record<string, string> = {};
+  const name = typeof values.name === "string" ? values.name.trim() : "";
+  const address = typeof values.address === "string" ? values.address.trim() : "";
+  const placeValue = values.googlePlaceId === undefined || values.googlePlaceId === null
+    ? ""
+    : values.googlePlaceId;
+  const place = typeof placeValue === "string" ? placeValue.trim() : null;
+
+  if (!name || name.length > BUILDING_NAME_MAX) {
+    errors.name = `Enter a name up to ${BUILDING_NAME_MAX} characters.`;
+  }
+  if (!address || address.length > BUILDING_ADDRESS_MAX) {
+    errors.address = `Enter an address up to ${BUILDING_ADDRESS_MAX} characters.`;
+  }
+  if (place === null || place.length > BUILDING_PLACE_ID_MAX) {
+    errors.googlePlaceId = `Enter a Google place id up to ${BUILDING_PLACE_ID_MAX} characters, or leave it blank.`;
+  }
+
+  const latitude = parseCoordinate(values.latitude, "latitude", -90, 90, errors);
+  const longitude = parseCoordinate(values.longitude, "longitude", -180, 180, errors);
+  if (Object.keys(errors).length > 0) return { ok: false, fieldErrors: errors };
+
+  return {
+    ok: true,
+    value: {
+      name,
+      address,
+      latitude: latitude as number,
+      longitude: longitude as number,
+      googlePlaceId: place ? place : null,
+    },
+  };
+}
+
+const BUILDING_COLUMNS = `
+  b.building_id, b.building_name, b.address, b.latitude, b.longitude, b.google_place_id,
+  (SELECT COUNT(*) FROM "Resource" AS r WHERE r.building_id = b.building_id) AS resource_count
+`;
+
+export async function listAdminBuildings(
+  client: DatabaseClient,
+  query: AdminBuildingQuery,
+): Promise<Page<AdminBuilding>> {
+  const result = await client.query<BuildingRow & { total: string | number }>(
+    `
+      SELECT
+        ${BUILDING_COLUMNS},
+        COUNT(*) OVER() AS total
+      FROM "Building" AS b
+      WHERE ($1 = '' OR b.building_name ILIKE '%' || $1 || '%' OR b.address ILIKE '%' || $1 || '%')
+      ORDER BY b.building_name, b.building_id
+      LIMIT $2 OFFSET $3
+    `,
+    [escapeLike(query.search), query.pageSize, (query.page - 1) * query.pageSize],
+  );
+
+  return {
+    items: result.rows.map(mapBuilding),
+    total: result.rows.length > 0 ? Number(result.rows[0].total) : 0,
+    page: query.page,
+    pageSize: query.pageSize,
+  };
+}
+
+export async function createBuilding(
+  client: DatabaseClient,
+  input: AdminBuildingInput,
+): Promise<AdminBuilding> {
+  const result = await client.query<BuildingRow>(
+    `
+      INSERT INTO "Building" AS b (building_name, address, latitude, longitude, google_place_id)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING ${BUILDING_COLUMNS}
+    `,
+    [input.name, input.address, input.latitude, input.longitude, input.googlePlaceId],
+  );
+  return mapBuilding(result.rows[0]);
+}
+
+export async function updateBuilding(
+  client: DatabaseClient,
+  buildingId: number,
+  input: AdminBuildingInput,
+): Promise<AdminResult<AdminBuilding>> {
+  const result = await client.query<BuildingRow>(
+    `
+      UPDATE "Building" AS b
+      SET building_name = $2, address = $3, latitude = $4, longitude = $5, google_place_id = $6
+      WHERE b.building_id = $1
+      RETURNING ${BUILDING_COLUMNS}
+    `,
+    [buildingId, input.name, input.address, input.latitude, input.longitude, input.googlePlaceId],
+  );
+  const row = result.rows[0];
+  if (!row) return { ok: false, status: 404, error: "Building not found." };
+  return { ok: true, value: mapBuilding(row) };
+}
+
+export async function deleteBuilding(
+  client: DatabaseClient,
+  buildingId: number,
+): Promise<AdminResult<null>> {
+  const existing = await client.query<{ building_id: number }>(
+    `SELECT building_id FROM "Building" WHERE building_id = $1`,
+    [buildingId],
+  );
+  if (!existing.rows[0]) return { ok: false, status: 404, error: "Building not found." };
+
+  const resources = await client.query<{ count: string | number }>(
+    `SELECT COUNT(*) AS count FROM "Resource" WHERE building_id = $1`,
+    [buildingId],
+  );
+  const resourceCount = Number(resources.rows[0]?.count ?? 0);
+  if (resourceCount > 0) {
+    return {
+      ok: false,
+      status: 409,
+      error: `This building still has ${resourceCount} resource${resourceCount === 1 ? "" : "s"}. Move or delete them before deleting the building.`,
+    };
+  }
+
+  await client.query(`DELETE FROM "Building" WHERE building_id = $1`, [buildingId]);
+  return { ok: true, value: null };
+}

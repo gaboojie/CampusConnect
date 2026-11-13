@@ -341,6 +341,16 @@ export type AdminReservation = {
   resource: { id: number; name: string }
 }
 
+export type AdminBuilding = {
+  id: number
+  name: string
+  address: string
+  latitude: number
+  longitude: number
+  googlePlaceId: string | null
+  resourceCount: number
+}
+
 export type AdminResource = {
   id: number
   name: string

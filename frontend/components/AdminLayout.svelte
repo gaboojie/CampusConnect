@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import Sidebar from './Sidebar.svelte'
+  import AdminBuildingsSection from './sections/AdminBuildingsSection.svelte'
   import AdminOverviewSection from './sections/AdminOverviewSection.svelte'
   import AdminReservationsSection from './sections/AdminReservationsSection.svelte'
   import AdminResourcesSection from './sections/AdminResourcesSection.svelte'
@@ -121,6 +122,8 @@
         <AdminReservationsSection />
       {:else if route.id === 'resources'}
         <AdminResourcesSection />
+      {:else if route.id === 'buildings'}
+        <AdminBuildingsSection />
       {:else}
         <AdminOverviewSection />
       {/if}

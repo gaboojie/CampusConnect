@@ -82,20 +82,26 @@ import {
   parseInboxQuery,
 } from "../db/repositories/inbox";
 import {
+  createBuilding,
   createUser as createAdminUser,
+  deleteBuilding,
   deleteResource as deleteAdminResource,
   deleteUserAccount,
   getAdminResourceDetail,
   getStats,
   getUserDetail,
+  listAdminBuildings,
   listAdminResources,
   listReservations,
   listUsers,
+  parseAdminBuilding,
+  parseAdminBuildingQuery,
   parseAdminCreateUser,
   parseAdminReservationQuery,
   parseAdminResourceQuery,
   parseAdminUpdateUser,
   parseAdminUserQuery,
+  updateBuilding,
   updateUser as updateAdminUser,
 } from "../db/repositories/admin";
 import {
@@ -219,6 +225,32 @@ function isUniqueViolation(error: unknown): boolean {
     "code" in error &&
     error.code === "23505"
   );
+}
+
+function isForeignKeyViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "23503"
+  );
+}
+
+function buildingConflict(error: unknown): { field: string; message: string } | null {
+  if (typeof error !== "object" || error === null || !("code" in error) || error.code !== "23505") {
+    return null;
+  }
+  const constraint = "constraint" in error && typeof error.constraint === "string" ? error.constraint : "";
+  if (constraint.includes("address")) {
+    return { field: "address", message: "A building with this address already exists." };
+  }
+  if (constraint.includes("google_place_id")) {
+    return { field: "googlePlaceId", message: "That Google place id is already used." };
+  }
+  if (constraint.includes("building_name")) {
+    return { field: "name", message: "A building with this name already exists." };
+  }
+  return { field: "form", message: "A building with these details already exists." };
 }
 
 function isBannedPathAllowed(path: string): boolean {
@@ -1672,6 +1704,119 @@ export function createApp(options: AppOptions = {}) {
       return c.json({ resource });
     } catch {
       return c.json({ error: "Unable to load this resource right now." }, 503);
+    }
+  });
+
+  app.get("/api/admin/buildings", async (c) => {
+    const query = parseAdminBuildingQuery(new URL(c.req.url).searchParams);
+
+    if (!query.ok) {
+      return c.json({ error: query.error }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const buildings = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => listAdminBuildings(client, query.value),
+      );
+      return c.json(buildings);
+    } catch {
+      return c.json({ error: "Unable to load buildings right now." }, 503);
+    }
+  });
+
+  app.post("/api/admin/buildings", async (c) => {
+    const validation = parseAdminBuilding(await readJson(c));
+
+    if (!validation.ok) {
+      return c.json(
+        { error: "Please correct the highlighted fields.", fieldErrors: validation.fieldErrors },
+        400,
+      );
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const building = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => createBuilding(client, validation.value),
+      );
+      return c.json({ building }, 201);
+    } catch (error) {
+      const conflict = buildingConflict(error);
+      if (conflict) {
+        return c.json({ error: conflict.message, fieldErrors: { [conflict.field]: conflict.message } }, 409);
+      }
+      return c.json({ error: "Unable to create the building right now." }, 503);
+    }
+  });
+
+  app.patch("/api/admin/buildings/:id", async (c) => {
+    const buildingId = parsePositiveId(c.req.param("id"));
+    const validation = parseAdminBuilding(await readJson(c));
+
+    if (buildingId === null) {
+      return c.json({ error: "Building id must be a positive whole number." }, 400);
+    }
+    if (!validation.ok) {
+      return c.json(
+        { error: "Please correct the highlighted fields.", fieldErrors: validation.fieldErrors },
+        400,
+      );
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => updateBuilding(client, buildingId, validation.value),
+      );
+      if (!result.ok) return c.json({ error: result.error }, result.status);
+      return c.json({ building: result.value });
+    } catch (error) {
+      const conflict = buildingConflict(error);
+      if (conflict) {
+        return c.json({ error: conflict.message, fieldErrors: { [conflict.field]: conflict.message } }, 409);
+      }
+      return c.json({ error: "Unable to update the building right now." }, 503);
+    }
+  });
+
+  app.delete("/api/admin/buildings/:id", async (c) => {
+    const buildingId = parsePositiveId(c.req.param("id"));
+
+    if (buildingId === null) {
+      return c.json({ error: "Building id must be a positive whole number." }, 400);
+    }
+    if (!c.env.DB) {
+      return databaseUnavailable(c);
+    }
+
+    try {
+      const result = await withDatabase(
+        c.env.DB.connectionString,
+        createDatabaseClient,
+        (client) => deleteBuilding(client, buildingId),
+      );
+      if (!result.ok) return c.json({ error: result.error }, result.status);
+      return c.json({ deleted: true });
+    } catch (error) {
+      if (isForeignKeyViolation(error)) {
+        return c.json({
+          error: "This building still has resources. Move or delete them before deleting the building.",
+        }, 409);
+      }
+      return c.json({ error: "Unable to delete the building right now." }, 503);
     }
   });
 

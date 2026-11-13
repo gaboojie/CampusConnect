@@ -13,6 +13,7 @@ export type RouteId =
   | 'admin-users'
   | 'admin-reservations'
   | 'admin-resources'
+  | 'admin-buildings'
 
 export type AppRoute = {
   id: RouteId
@@ -123,6 +124,13 @@ export const routes: AppRoute[] = [
     label: 'Resources',
     description: 'Review and manage every listed resource.',
     icon: ['M4 4h7.5l8.5 8.5-7.5 7.5L4 11.5Z', 'M8.5 8.5h.01'],
+    adminOnly: true,
+  },
+  {
+    id: 'admin-buildings',
+    label: 'Buildings',
+    description: 'Add, update, and remove campus buildings.',
+    icon: ['M4 20h16', 'M6 20V9l6-5 6 5v11', 'M10 20v-6h4v6'],
     adminOnly: true,
   },
 ]

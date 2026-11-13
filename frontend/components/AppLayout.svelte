@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import Sidebar from './Sidebar.svelte'
   import ActivitySection from './sections/ActivitySection.svelte'
+  import AdminBuildingsSection from './sections/AdminBuildingsSection.svelte'
   import AdminOverviewSection from './sections/AdminOverviewSection.svelte'
   import AdminReservationsSection from './sections/AdminReservationsSection.svelte'
   import AdminResourcesSection from './sections/AdminResourcesSection.svelte'
@@ -154,6 +155,8 @@
       <AdminReservationsSection />
     {:else if route.id === 'admin-resources'}
       <AdminResourcesSection />
+    {:else if route.id === 'admin-buildings'}
+      <AdminBuildingsSection />
     {:else if route.id === 'users' && location.subpath}
       <UserProfileSection userId={location.subpath} />
     {:else if route.id === 'resources' && location.subpath}
